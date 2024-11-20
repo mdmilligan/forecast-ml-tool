@@ -1,0 +1,128 @@
+from ib_insync import *
+import pandas as pd
+import sqlite3
+import logging
+from datetime import datetime, timedelta
+
+logging.basicConfig(level=logging.INFO)
+
+DB_PATH = r'C:\DevProjects\MarketForecastTool\marketdata.db'
+
+def create_table_if_not_exists(conn, symbol):
+    cursor = conn.cursor()
+    table_name = f"stock_data_{symbol.lower()}"
+    cursor.execute(f'''
+        CREATE TABLE IF NOT EXISTS {table_name} (
+            date TIMESTAMP,
+            open REAL,
+            high REAL,
+            low REAL,
+            close REAL,
+            volume INTEGER,
+            average REAL,
+            barCount INTEGER,
+            PRIMARY KEY (date)
+        )
+    ''')
+    conn.commit()
+
+def get_historical_data_chunk(ib, contract, end_datetime, duration='1 M'):
+    bars = ib.reqHistoricalData(
+        contract,
+        endDateTime=end_datetime,
+        durationStr=duration,
+        barSizeSetting='5 mins',
+        whatToShow='TRADES',
+        useRTH=True,
+        formatDate=1
+    )
+    return bars
+
+def get_all_historical_data(ib, symbol, conn):
+    try:
+        if symbol == 'VIX':
+            contract = Index(symbol, 'CBOE', 'USD')
+        else:
+            contract = Stock(symbol, 'SMART', 'USD')
+            
+        print(f"\nRequesting historical data for {symbol}...")
+        
+        # Start with current date
+        end_date = datetime.now()
+        all_bars = []
+        chunks_received = 0
+        
+        # Request data in 1-month chunks for the past 3 years
+        for _ in range(36):  # 36 months = 3 years
+            try:
+                print(f"Requesting chunk ending {end_date.strftime('%Y-%m-%d')}")
+                bars = get_historical_data_chunk(ib, contract, end_date.strftime('%Y%m%d %H:%M:%S'))
+                
+                if bars:
+                    all_bars = bars + all_bars  # Prepend new bars
+                    chunks_received += 1
+                    print(f"Received {len(bars)} bars for chunk {chunks_received}")
+                else:
+                    print(f"No data received for chunk ending {end_date.strftime('%Y-%m-%d')}")
+                
+                # Move end_date back by 1 month
+                end_date = end_date - timedelta(days=30)
+                
+                # Add a delay between requests to avoid pacing violations
+                ib.sleep(3)
+                
+            except Exception as e:
+                print(f"Error getting chunk: {str(e)}")
+                ib.sleep(10)  # Longer delay after an error
+                continue
+        
+        if all_bars:
+            df = util.df(all_bars)
+            df = df.drop_duplicates(subset=['date'])  # Remove any duplicate dates
+            df = df.sort_values('date')
+            
+            print(f"\nTotal bars collected for {symbol}: {len(df)}")
+            print(f"Date range: {df['date'].min()} to {df['date'].max()}")
+            
+            # Save to database
+            create_table_if_not_exists(conn, symbol)
+            table_name = f"stock_data_{symbol.lower()}"
+            df.to_sql(table_name, conn, if_exists='replace', index=False)
+            print(f"Data saved to database table: {table_name}")
+            
+            return df
+            
+    except Exception as e:
+        print(f"Error processing {symbol}: {str(e)}")
+        return None
+
+def main():
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        print(f"Connected to database: {DB_PATH}")
+        
+        print("Connecting to IBGateway...")
+        ib = IB()
+        ib.connect('127.0.0.1', 4001, clientId=123)
+        
+        symbols = ['UUP']
+        ##symbols = ['SPY', 'QQQ', 'VIX']
+        
+        for symbol in symbols:
+            df = get_all_historical_data(ib, symbol, conn)
+            ib.sleep(5)  # Delay between symbols
+            
+    except Exception as e:
+        print(f"\nError occurred: {str(e)}")
+        
+    finally:
+        if 'conn' in locals():
+            conn.close()
+            print("Database connection closed")
+            
+        if 'ib' in locals() and ib.isConnected():
+            ib.disconnect()
+            print("\nDisconnected from IBGateway")
+
+if __name__ == "__main__":
+    main()
