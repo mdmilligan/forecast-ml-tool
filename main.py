@@ -188,7 +188,7 @@ def backtest_strategy(df, signals, confidence_scores):
         'avg_position_size': avg_position_size
     }
 
-def plot_results(df, backtest_results, predictions, confidence_scores, signals):
+def plot_results(df, backtest_results, predictions, confidence_scores, signals, model, feature_columns):
     """
     Enhanced plotting with position sizing visualization
     """
@@ -278,7 +278,7 @@ def main():
     print(f"Average Position Size: {backtest_results['avg_position_size']:.2%}")
     
     # Plot results
-    plot_results(df, backtest_results, predictions, confidence_scores, signals)
+    plot_results(df, backtest_results, predictions, confidence_scores, signals, model, feature_columns)
     
     # Make prediction for next day
     latest_data = df[feature_columns].iloc[-1:]
