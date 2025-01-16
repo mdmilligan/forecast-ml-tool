@@ -4,29 +4,37 @@ from sklearn.model_selection import TimeSeriesSplit
 from sklearn.preprocessing import StandardScaler
 from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor
 from sklearn.metrics import mean_squared_error, r2_score
-import yfinance as yf
 import matplotlib.pyplot as plt
 import seaborn as sns
 from datetime import datetime, timedelta
+import sqlite3
 
 def fetch_data(start_date='2010-01-01', end_date='2024-01-01'):
     """
-    Fetch historical data for SPY and indicators
+    Fetch historical data for SPY, VIX and UUP from database
     """
-    # Download data for SPY and VIX
-    spy = yf.download('SPY', start=start_date, end=end_date)
-    vix = yf.download('^VIX', start=start_date, end=end_date)
+    # Connect to database
+    conn = sqlite3.connect('data/marketdata.db')
+    
+    # Read data from database
+    spy = pd.read_sql("SELECT * FROM stock_data_spy WHERE date >= ? AND date <= ?", 
+                     conn, params=(start_date, end_date), parse_dates=['date'], index_col='date')
+    vix = pd.read_sql("SELECT * FROM stock_data_vix WHERE date >= ? AND date <= ?", 
+                     conn, params=(start_date, end_date), parse_dates=['date'], index_col='date')
+    uup = pd.read_sql("SELECT * FROM stock_data_uup WHERE date >= ? AND date <= ?", 
+                     conn, params=(start_date, end_date), parse_dates=['date'], index_col='date')
     
     # Create main dataframe with SPY data
     df = pd.DataFrame(index=spy.index)
     
     # Add basic price and volume data
-    df['spy_close'] = spy['Close']
-    df['spy_open'] = spy['Open']
-    df['spy_high'] = spy['High']
-    df['spy_low'] = spy['Low']
-    df['spy_volume'] = spy['Volume']
-    df['vix_close'] = vix['Close']
+    df['spy_close'] = spy['close']
+    df['spy_open'] = spy['open']
+    df['spy_high'] = spy['high']
+    df['spy_low'] = spy['low']
+    df['spy_volume'] = spy['volume']
+    df['vix_close'] = vix['close']
+    df['uup_close'] = uup['close']
     
     # Calculate technical indicators
     # Moving averages
@@ -64,7 +72,7 @@ def prepare_features(df):
     Prepare features for model training
     """
     feature_columns = [
-        'spy_close', 'spy_volume', 'vix_close',
+        'spy_close', 'spy_volume', 'vix_close', 'uup_close',
         'sma_20', 'sma_50', 'rsi', 'macd', 'macd_signal',
         'bb_upper', 'bb_lower', 'volatility'
     ]
