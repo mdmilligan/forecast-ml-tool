@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 
 logging.basicConfig(level=logging.INFO)
 
-DB_PATH = r'C:\DevProjects\MarketForecastTool\marketdata.db'
+DB_PATH = r'C:\DevProjects\MarketForecastTool\data\marketdata.db'
 
 def create_table_if_not_exists(conn, symbol):
     cursor = conn.cursor()
