@@ -2,6 +2,7 @@ from ib_insync import *
 import pandas as pd
 import sqlite3
 import logging
+import argparse
 from datetime import datetime, timedelta
 
 logging.basicConfig(level=logging.INFO)
@@ -31,14 +32,14 @@ def get_historical_data_chunk(ib, contract, end_datetime, duration='1 M'):
         contract,
         endDateTime=end_datetime,
         durationStr=duration,
-        barSizeSetting='5 mins',
+        barSizeSetting=bar_size,
         whatToShow='TRADES',
         useRTH=True,
         formatDate=1
     )
     return bars
 
-def get_all_historical_data(ib, symbol, conn):
+def get_all_historical_data(ib, symbol, conn, bar_size='5 mins', months=36):
     try:
         if symbol == 'VIX':
             contract = Index(symbol, 'CBOE', 'USD')
@@ -52,8 +53,8 @@ def get_all_historical_data(ib, symbol, conn):
         all_bars = []
         chunks_received = 0
         
-        # Request data in 1-month chunks for the past 3 years
-        for _ in range(36):  # 36 months = 3 years
+        # Request data in 1-month chunks for the specified number of months
+        for _ in range(months):
             try:
                 print(f"Requesting chunk ending {end_date.strftime('%Y-%m-%d')}")
                 bars = get_historical_data_chunk(ib, contract, end_date.strftime('%Y%m%d %H:%M:%S'))
@@ -98,6 +99,18 @@ def get_all_historical_data(ib, symbol, conn):
 
 def main():
     try:
+        # Set up argument parsing
+        parser = argparse.ArgumentParser(description='Fetch historical data from IBKR')
+        parser.add_argument('--symbol', '-s', type=str, required=True,
+                          help='Stock symbol to fetch (e.g., SPY)')
+        parser.add_argument('--bar-size', '-b', type=str, default='5 mins',
+                          choices=['1 min', '5 mins', '15 mins', '30 mins', '1 hour', '1 day'],
+                          help='Bar size for historical data')
+        parser.add_argument('--months', '-m', type=int, default=36,
+                          help='Number of months of historical data to fetch')
+        
+        args = parser.parse_args()
+        
         conn = sqlite3.connect(DB_PATH)
         print(f"Connected to database: {DB_PATH}")
         
@@ -105,12 +118,8 @@ def main():
         ib = IB()
         ib.connect('127.0.0.1', 4001, clientId=123)
         
-        symbols = ['UUP']
-        ##symbols = ['SPY', 'QQQ', 'VIX']
-        
-        for symbol in symbols:
-            df = get_all_historical_data(ib, symbol, conn)
-            ib.sleep(5)  # Delay between symbols
+        print(f"\nFetching {args.months} months of {args.bar_size} data for {args.symbol}...")
+        df = get_all_historical_data(ib, args.symbol, conn, bar_size=args.bar_size, months=args.months)
             
     except Exception as e:
         print(f"\nError occurred: {str(e)}")
