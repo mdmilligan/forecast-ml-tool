@@ -28,29 +28,29 @@ def load_market_data(start_date='2010-01-01', end_date='2024-01-01'):
 
 def calculate_technical_indicators(df):
     """Calculate all technical indicators"""
-    # Moving averages
-    df['sma_20'] = df['spy_close'].rolling(window=20).mean()
-    df['sma_50'] = df['spy_close'].rolling(window=50).mean()
+    # Moving averages (adjusted for 30-min intervals)
+    df['sma_20'] = df['spy_close'].rolling(window=20*2).mean()  # 20 periods = 10 hours
+    df['sma_50'] = df['spy_close'].rolling(window=50*2).mean()  # 50 periods = 25 hours
     
-    # RSI
+    # RSI (standard 14 periods)
     delta = df['spy_close'].diff()
     gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
     loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
     rs = gain / loss
     df['rsi'] = 100 - (100 / (1 + rs))
     
-    # MACD
+    # MACD (standard 12,26,9 periods)
     exp1 = df['spy_close'].ewm(span=12, adjust=False).mean()
     exp2 = df['spy_close'].ewm(span=26, adjust=False).mean()
     df['macd'] = exp1 - exp2
     df['macd_signal'] = df['macd'].ewm(span=9, adjust=False).mean()
     
-    # Bollinger Bands
+    # Bollinger Bands (standard 20 periods)
     df['bb_middle'] = df['spy_close'].rolling(window=20).mean()
     df['bb_upper'] = df['bb_middle'] + 2 * df['spy_close'].rolling(window=20).std()
     df['bb_lower'] = df['bb_middle'] - 2 * df['spy_close'].rolling(window=20).std()
     
-    # Volatility
-    df['volatility'] = df['spy_close'].rolling(window=20).std()
+    # Volatility (20 periods = 10 hours)
+    df['volatility'] = df['spy_close'].rolling(window=20*2).std()
     
     return df

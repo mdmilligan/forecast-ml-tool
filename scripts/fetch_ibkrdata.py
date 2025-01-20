@@ -114,7 +114,7 @@ def main():
         parser = argparse.ArgumentParser(description='Fetch historical data from IBKR')
         parser.add_argument('--symbol', '-s', type=str, required=True,
                           help='Stock symbol to fetch (e.g., SPY)')
-        parser.add_argument('--bar-size', '-b', type=str, default='5 mins',
+        parser.add_argument('--bar-size', '-b', type=str, default='30 mins',
                           choices=['1 min', '5 mins', '15 mins', '30 mins', '1 hour', '1 day'],
                           help='Bar size for historical data')
         parser.add_argument('--months', '-m', type=int, default=36,

@@ -5,10 +5,15 @@ from data_processing import load_market_data, calculate_technical_indicators
 
 def plot_indicators(df):
     """Plot current technical indicators using Plotly"""
-    # Create subplots
+    # Create subplots with 30-min interval indicators
     fig = make_subplots(rows=4, cols=1, shared_xaxes=True,
                        vertical_spacing=0.05,
-                       subplot_titles=('Price and Moving Averages', 'RSI', 'MACD', 'Bollinger Bands'))
+                       subplot_titles=(
+                           'Price and Moving Averages (30-min intervals)',
+                           'RSI (30-min intervals)',
+                           'MACD (30-min intervals)',
+                           'Bollinger Bands (30-min intervals)'
+                       ))
     
     # Price and Moving Averages
     fig.add_trace(go.Scatter(x=df.index, y=df['spy_close'], name='Price'), row=1, col=1)
@@ -29,10 +34,18 @@ def plot_indicators(df):
     fig.add_trace(go.Scatter(x=df.index, y=df['bb_upper'], name='Upper Band'), row=4, col=1)
     fig.add_trace(go.Scatter(x=df.index, y=df['bb_lower'], name='Lower Band'), row=4, col=1)
     
-    # Update layout
-    fig.update_layout(height=1000, width=1200, 
-                     title_text="Technical Indicators",
-                     showlegend=True)
+    # Update layout with trading hours reference
+    fig.update_layout(
+        height=1200, 
+        width=1400,
+        title_text="Technical Indicators - 30 Minute Intervals",
+        showlegend=True,
+        xaxis=dict(
+            tickformat='%Y-%m-%d %H:%M',
+            rangeslider=dict(visible=True)
+        )
+    )
+    
     fig.update_yaxes(title_text="Price", row=1, col=1)
     fig.update_yaxes(title_text="RSI", row=2, col=1)
     fig.update_yaxes(title_text="MACD", row=3, col=1)
@@ -48,4 +61,4 @@ if __name__ == "__main__":
     df = calculate_technical_indicators(df)
     
     # Plot current indicators
-    plot_indicators(df[-100:])  # Show last 100 days
+    plot_indicators(df[-200:])  # Show last 200 periods (100 hours)
