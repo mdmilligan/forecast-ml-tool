@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 
 logging.basicConfig(level=logging.INFO)
 
-DB_PATH = r'C:\DevProjects\MarketForecastTool\data\marketdata.db'
+DB_PATH = 'data/marketdata.db'
 
 def create_table_if_not_exists(conn, symbol):
     cursor = conn.cursor()
@@ -27,7 +27,7 @@ def create_table_if_not_exists(conn, symbol):
     ''')
     conn.commit()
 
-def get_historical_data_chunk(ib, contract, end_datetime, duration='1 M'):
+def get_historical_data_chunk(ib, contract, end_datetime, bar_size, duration='1 M'):
     bars = ib.reqHistoricalData(
         contract,
         endDateTime=end_datetime,
@@ -39,7 +39,7 @@ def get_historical_data_chunk(ib, contract, end_datetime, duration='1 M'):
     )
     return bars
 
-def get_all_historical_data(ib, symbol, conn, bar_size='5 mins', months=36):
+def get_all_historical_data(ib, symbol, conn, bar_size='30 mins', months=36):
     try:
         if symbol == 'VIX':
             contract = Index(symbol, 'CBOE', 'USD')
@@ -116,7 +116,17 @@ def main():
         
         print("Connecting to IBGateway...")
         ib = IB()
-        ib.connect('127.0.0.1', 4001, clientId=123)
+        # Try common IBKR ports
+        ports = [7497, 4001, 4002]
+        for port in ports:
+            try:
+                ib.connect('127.0.0.1', port, clientId=1)
+                print(f"Connected to IBKR on port {port}")
+                break
+            except Exception as e:
+                print(f"Failed to connect on port {port}: {str(e)}")
+        else:
+            raise ConnectionError("Could not connect to IBKR on any port")
         
         print(f"\nFetching {args.months} months of {args.bar_size} data for {args.symbol}...")
         df = get_all_historical_data(ib, args.symbol, conn, bar_size=args.bar_size, months=args.months)
