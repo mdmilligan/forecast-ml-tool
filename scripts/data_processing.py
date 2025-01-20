@@ -2,8 +2,8 @@ import pandas as pd
 import numpy as np
 import sqlite3
 
-def fetch_data(start_date='2010-01-01', end_date='2024-01-01'):
-    """Fetch and preprocess historical data"""
+def load_market_data(start_date='2010-01-01', end_date='2024-01-01'):
+    """Load and preprocess historical market data from database"""
     conn = sqlite3.connect('data/marketdata.db')
     
     # Read data from database

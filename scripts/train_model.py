@@ -4,7 +4,7 @@ from sklearn.ensemble import RandomForestRegressor
 from sklearn.preprocessing import StandardScaler
 import joblib
 from datetime import datetime
-from data_processing import fetch_data, calculate_technical_indicators
+from data_processing import load_market_data, calculate_technical_indicators
 
 def prepare_features(df):
     """Prepare features for model training"""
@@ -38,7 +38,7 @@ if __name__ == "__main__":
     start_time = datetime.now()
     
     # Fetch and prepare data
-    df = fetch_data()
+    df = load_market_data()
     df = calculate_technical_indicators(df)
     X, y, scaler, feature_columns = prepare_features(df)
     
