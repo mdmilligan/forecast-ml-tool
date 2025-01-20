@@ -7,7 +7,11 @@ from datetime import datetime, timedelta
 
 logging.basicConfig(level=logging.INFO)
 
-DB_PATH = 'data/marketdata.db'
+import os
+
+# Get absolute path to database
+DB_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'marketdata.db')
+os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
 
 def create_table_if_not_exists(conn, symbol):
     cursor = conn.cursor()
@@ -46,6 +50,8 @@ def get_all_historical_data(ib, symbol, conn, bar_size='30 mins', months=36):
         else:
             contract = Stock(symbol, 'SMART', 'USD')
             
+        ib.qualifyContracts(contract)  # Ensure contract is qualified
+            
         print(f"\nRequesting historical data for {symbol}...")
         
         # Start with current date
@@ -57,7 +63,12 @@ def get_all_historical_data(ib, symbol, conn, bar_size='30 mins', months=36):
         for _ in range(months):
             try:
                 print(f"Requesting chunk ending {end_date.strftime('%Y-%m-%d')}")
-                bars = get_historical_data_chunk(ib, contract, end_date.strftime('%Y%m%d %H:%M:%S'))
+                bars = get_historical_data_chunk(
+                    ib, 
+                    contract, 
+                    end_date.strftime('%Y%m%d %H:%M:%S'), 
+                    bar_size
+                )
                 
                 if bars:
                     all_bars = bars + all_bars  # Prepend new bars
@@ -117,16 +128,30 @@ def main():
         print("Connecting to IBGateway...")
         ib = IB()
         # Try common IBKR ports
+        # Try common IBKR ports with timeout
         ports = [7497, 4001, 4002]
+        timeout = 10  # seconds
         for port in ports:
             try:
-                ib.connect('127.0.0.1', port, clientId=1)
-                print(f"Connected to IBKR on port {port}")
-                break
+                print(f"Attempting connection on port {port}...")
+                ib.connect('127.0.0.1', port, clientId=1, timeout=timeout)
+                if ib.isConnected():
+                    print(f"Successfully connected to IBKR on port {port}")
+                    # Verify connection by requesting account data
+                    accounts = ib.managedAccounts()
+                    if accounts:
+                        print(f"Connected to account: {accounts[0]}")
+                        break
+                    else:
+                        print("No accounts found - disconnecting")
+                        ib.disconnect()
+                else:
+                    print("Connection failed")
             except Exception as e:
                 print(f"Failed to connect on port {port}: {str(e)}")
+                ib.sleep(1)  # Short delay between attempts
         else:
-            raise ConnectionError("Could not connect to IBKR on any port")
+            raise ConnectionError(f"Could not connect to IBKR on any port after {len(ports)} attempts")
         
         print(f"\nFetching {args.months} months of {args.bar_size} data for {args.symbol}...")
         df = get_all_historical_data(ib, args.symbol, conn, bar_size=args.bar_size, months=args.months)
