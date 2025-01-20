@@ -1,7 +1,7 @@
 import pandas as pd
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
-from train_model import fetch_data, calculate_technical_indicators
+from data_processing import fetch_data, calculate_technical_indicators
 
 def plot_indicators(df):
     """Plot current technical indicators using Plotly"""
