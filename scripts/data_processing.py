@@ -185,18 +185,17 @@ def calculate_technical_indicators(df: pd.DataFrame, params: dict = None) -> pd.
         period_min = df['hl2'].rolling(params['fisher_length']).min()
         period_max = df['hl2'].rolling(params['fisher_length']).max()
         
-        value = pd.Series(0, index=df.index)
-        fisher = pd.Series(0, index=df.index)
+        # Calculate normalized price
+        normalized_price = 0.66 * ((df['hl2'] - period_min) / 
+                                 (period_max - period_min + 1e-9) - 0.5)
         
-        for i in range(1, len(df)):
-            value.iloc[i] = 0.66 * ((df['hl2'].iloc[i] - period_min.iloc[i]) / 
-                                   (period_max.iloc[i] - period_min.iloc[i] + 1e-9) - 0.5) + \
-                           0.67 * value.iloc[i-1]
-            value.iloc[i] = np.clip(value.iloc[i], -0.999, 0.999)
-            fisher.iloc[i] = 0.5 * np.log((1 + value.iloc[i]) / (1 - value.iloc[i])) + \
-                           0.5 * fisher.iloc[i-1]
+        # Calculate value with EMA smoothing
+        value = normalized_price.ewm(alpha=0.33, adjust=False).mean()
+        value = value.clip(-0.999, 0.999)
         
-        df['fisher'] = fisher
+        # Calculate Fisher Transform
+        df['fisher'] = 0.5 * np.log((1 + value) / (1 - value))
+        df['fisher'] = df['fisher'].ewm(alpha=0.5, adjust=False).mean()
         df['fisher_trigger'] = df['fisher'].shift(1)
         
         # Distance to MAs
