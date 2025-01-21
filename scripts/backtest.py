@@ -9,22 +9,28 @@ class Backtester:
         self.initial_capital = initial_capital
         self.commission = commission
         
-    def calculate_returns(self, df, signals):
-        """Calculate strategy returns"""
+    def calculate_returns(self, df, signals, confidence_scores=None):
+        """Calculate strategy returns with confidence-based position sizing"""
         # Initialize portfolio values
         portfolio_value = self.initial_capital
         position = 0
         returns = []
         trade_count = 0
         
+        # If no confidence scores provided, use full position
+        if confidence_scores is None:
+            confidence_scores = np.ones(len(signals))
+        
         # Calculate daily returns
         for i in range(1, len(df)):
             current_price = df['spy_close'].iloc[i]
             prev_price = df['spy_close'].iloc[i-1]
             
-            # Calculate position change
+            # Calculate position change with confidence-based sizing
             signal = signals.iloc[i]
-            position_change = signal - position
+            confidence = confidence_scores[i] if i < len(confidence_scores) else 1.0
+            target_position = signal * confidence
+            position_change = target_position - position
             
             # Calculate return with commission
             if position_change != 0:
@@ -77,13 +83,24 @@ class Backtester:
             'trade_count': trade_count
         }
     
-    def plot_results(self, strategy_returns, benchmark_returns, metrics):
-        """Plot backtest results"""
+    def plot_results(self, strategy_returns, benchmark_returns, metrics, confidence_scores=None):
+        """Plot backtest results with confidence visualization"""
         plt.figure(figsize=(12, 8))
         
+        # Create subplots
+        ax1 = plt.subplot(2, 1, 1)
+        
         # Plot strategy vs benchmark
-        plt.plot(strategy_returns, label='Strategy')
-        plt.plot(benchmark_returns, label='Benchmark (Buy & Hold)')
+        ax1.plot(strategy_returns, label='Strategy')
+        ax1.plot(benchmark_returns, label='Benchmark (Buy & Hold)')
+        
+        # Add confidence visualization if available
+        if confidence_scores is not None:
+            ax2 = plt.subplot(2, 1, 2, sharex=ax1)
+            ax2.plot(confidence_scores, color='purple', alpha=0.6, label='Confidence')
+            ax2.axhline(y=0.7, color='red', linestyle='--', label='Confidence Threshold')
+            ax2.set_ylabel('Confidence')
+            ax2.legend()
         plt.title(f"Backtest Results\nAnnualized Return: {metrics['annualized_return']:.2%}")
         plt.xlabel('Days')
         plt.ylabel('Portfolio Value')
@@ -104,12 +121,12 @@ class Backtester:
         
         plt.show()
 
-def run_backtest(df, signals):
-    """Run complete backtest"""
+def run_backtest(df, signals, confidence_scores=None):
+    """Run complete backtest with optional confidence scores"""
     backtester = Backtester()
     
     # Calculate strategy returns
-    strategy_returns, trade_count = backtester.calculate_returns(df, signals)
+    strategy_returns, trade_count = backtester.calculate_returns(df, signals, confidence_scores)
     
     # Calculate benchmark returns (buy & hold)
     benchmark_returns = df['spy_close'].values / df['spy_close'].iloc[0] * backtester.initial_capital
@@ -118,6 +135,6 @@ def run_backtest(df, signals):
     metrics = backtester.calculate_metrics(strategy_returns, benchmark_returns, trade_count)
     
     # Plot results
-    backtester.plot_results(strategy_returns, benchmark_returns, metrics)
+    backtester.plot_results(strategy_returns, benchmark_returns, metrics, confidence_scores)
     
     return metrics

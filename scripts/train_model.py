@@ -54,6 +54,22 @@ def prepare_features(df):
     
     return X_scaled, y, scaler, feature_columns, valid_idx
 
+class MLStrategy:
+    def __init__(self, model, scaler, feature_columns):
+        self.model = model
+        self.scaler = scaler
+        self.feature_columns = feature_columns
+        
+    def calculate_confidence_score(self, X_scaled):
+        """Calculate confidence score based on prediction variance"""
+        # Get predictions from all trees
+        predictions = np.array([tree.predict(X_scaled) for tree in self.model.estimators_])
+        
+        # Calculate confidence as inverse of standard deviation
+        std_dev = np.std(predictions, axis=0)
+        confidence = 1 / (1 + std_dev)
+        return confidence
+
 def train_model(X_train, y_train):
     """Train and save the model with improved parameters"""
     model = RandomForestRegressor(
@@ -121,9 +137,26 @@ if __name__ == "__main__":
     print("\nTop 10 Feature Importances:")
     print(feature_importance_df.head(10))
     
-    # Generate signals using more sensitive thresholds
-    signals = pd.Series(np.where(y_pred > 0.0025, 1, np.where(y_pred < -0.0025, -1, 0)),
-                       index=df.index[train_size:train_size+len(y_test)])
+    # Create ML strategy instance
+    strategy = MLStrategy(model, scaler, feature_columns)
+    
+    # Calculate confidence scores
+    confidence_scores = strategy.calculate_confidence_score(X_test)
+    
+    # Generate signals with confidence threshold
+    min_confidence = 0.7  # Minimum confidence threshold
+    signals = pd.Series(
+        np.where(
+            (y_pred > 0.0025) & (confidence_scores > min_confidence), 
+            1, 
+            np.where(
+                (y_pred < -0.0025) & (confidence_scores > min_confidence), 
+                -1, 
+                0
+            )
+        ),
+        index=df.index[train_size:train_size+len(y_test)]
+    )
     
     # Initialize backtest metrics
     backtest_metrics = {
@@ -135,7 +168,7 @@ if __name__ == "__main__":
     if signals.abs().sum() > 0:
         from backtest import run_backtest
         test_df = df.iloc[train_size:train_size+len(y_test)]
-        backtest_metrics = run_backtest(test_df, signals)
+        backtest_metrics = run_backtest(test_df, signals, confidence_scores)
         
         # Save test predictions
         test_results = pd.DataFrame({
