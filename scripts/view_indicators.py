@@ -62,6 +62,7 @@ def plot_indicators(df):
     
     # Ultimate RSI
     fig.add_trace(go.Scatter(x=df.index, y=df['ultimate_rsi'], name='Ultimate RSI'), row=11, col=1)
+    fig.add_trace(go.Scatter(x=df.index, y=df['ultimate_rsi_signal'], name='RSI Signal', line=dict(dash='dot')), row=11, col=1)
     
     # Update layout to only show periods with data
     fig.update_layout(

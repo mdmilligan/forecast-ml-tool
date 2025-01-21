@@ -78,9 +78,14 @@ def calculate_ultimate_rsi(df: pd.DataFrame, length: int = 14, smooth: int = 5) 
             50
         )
         
-        signal = pd.Series(ultimate_rsi).ewm(span=smooth, adjust=False).mean()
+        # Convert ultimate_rsi to Series and calculate EMA
+        ultimate_rsi_series = pd.Series(ultimate_rsi, index=df.index)
+        signal = ultimate_rsi_series.ewm(span=smooth, adjust=False).mean()
         
-        return ultimate_rsi, signal
+        # Fill initial NaN values with the first valid value
+        signal.fillna(method='bfill', inplace=True)
+        
+        return ultimate_rsi_series, signal.rename('ultimate_rsi_signal')
         
     except Exception as e:
         logger.error(f"Error calculating Ultimate RSI: {str(e)}")
