@@ -34,7 +34,7 @@ def plot_indicators(df):
     fig.add_trace(go.Scatter(x=df.index, y=df['bb_upper'], name='Upper Band'), row=4, col=1)
     fig.add_trace(go.Scatter(x=df.index, y=df['bb_lower'], name='Lower Band'), row=4, col=1)
     
-    # Update layout with trading hours reference
+    # Update layout to only show periods with data
     fig.update_layout(
         height=1200, 
         width=1400,
@@ -42,8 +42,22 @@ def plot_indicators(df):
         showlegend=True,
         xaxis=dict(
             tickformat='%Y-%m-%d %H:%M',
-            rangeslider=dict(visible=True)
-        )
+            rangeslider=dict(visible=True),
+            range=[df.index.min(), df.index.max()],  # Set range to actual data bounds
+            autorange=False
+        ),
+        xaxis_rangeslider_visible=True,
+        xaxis_rangeslider_thickness=0.1
+    )
+    
+    # Remove gaps in time series
+    fig.update_xaxes(
+        rangebreaks=[
+            # Hide weekends
+            dict(bounds=["sat", "mon"]),
+            # Hide hours outside trading times
+            dict(bounds=[16, 9.5], pattern="hour")  # 4pm to 9:30am
+        ]
     )
     
     fig.update_yaxes(title_text="Price", row=1, col=1)
