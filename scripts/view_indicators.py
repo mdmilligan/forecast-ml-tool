@@ -106,8 +106,8 @@ def plot_indicators(df):
 if __name__ == "__main__":
     print("Fetching and displaying current indicators...")
     
-    # Fetch and calculate indicators
-    df = load_market_data()
+    # Fetch and calculate indicators with updated date range
+    df = load_market_data(start_date='2010-01-01', end_date='2025-01-20')
     df = calculate_technical_indicators(df)
     
     # Plot current indicators
