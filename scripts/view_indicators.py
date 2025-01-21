@@ -25,8 +25,8 @@ def plot_indicators(df):
     
     # Price and Moving Averages
     fig.add_trace(go.Scatter(x=df.index, y=df['spy_close'], name='Price'), row=1, col=1)
-    fig.add_trace(go.Scatter(x=df.index, y=df['SMA20'], name='SMA 20'), row=1, col=1)
-    fig.add_trace(go.Scatter(x=df.index, y=df['EMA50'], name='EMA 50'), row=1, col=1)
+    # fig.add_trace(go.Scatter(x=df.index, y=df['SMA20'], name='SMA 20'), row=1, col=1)
+    # fig.add_trace(go.Scatter(x=df.index, y=df['EMA50'], name='EMA 50'), row=1, col=1)
     
     # BB %B
     fig.add_trace(go.Scatter(x=df.index, y=df['bb_percent_b'], name='BB %B'), row=2, col=1)
