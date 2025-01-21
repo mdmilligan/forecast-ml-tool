@@ -119,13 +119,25 @@ if __name__ == "__main__":
     print("\nTop 10 Feature Importances:")
     print(feature_importance_df.head(10))
     
+    # Generate signals from predictions
+    signals = pd.Series(np.where(y_pred > 0.005, 1, np.where(y_pred < -0.005, -1, 0)),
+                       index=df.index[train_size:train_size+len(y_test)])
+    
+    # Run backtest
+    from backtest import run_backtest
+    test_df = df.iloc[train_size:train_size+len(y_test)]
+    backtest_metrics = run_backtest(test_df, signals)
+    
     # Save test predictions
     test_results = pd.DataFrame({
         'Actual': y_test,
-        'Predicted': y_pred
+        'Predicted': y_pred,
+        'Signal': signals
     }, index=df.index[train_size:train_size+len(y_test)])
     
     test_results.to_csv('data/test_predictions.csv')
+    print("\nBacktest Metrics:")
+    print(backtest_metrics)
     print("\nSaved test predictions to data/test_predictions.csv")
     
     print(f"\nModel training complete! Time taken: {datetime.now() - start_time}")
