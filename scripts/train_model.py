@@ -137,19 +137,9 @@ if __name__ == "__main__":
         'Std': std
     }).sort_values('Importance', ascending=False)
     
-    # Plot feature importance with error bars
-    fig, ax = plt.subplots(figsize=(10, 8))
-    feature_importance_df.plot.barh(x='Feature', y='Importance', xerr='Std', 
-                                  title='Feature Importance with Standard Deviation',
-                                  legend=False, ax=ax)
-    ax.set_xlabel('Importance')
-    ax.set_ylabel('Feature')
-    plt.tight_layout()
-    plt.savefig('data/feature_importance.png')
-    
-    # Print all feature importances
+    # Print all feature importances with formatting
     print("\nAll Feature Importances:")
-    print(feature_importance_df.sort_values('Importance', ascending=False))
+    print(feature_importance_df.sort_values('Importance', ascending=False).to_string())
     
     # Create ML strategy instance
     strategy = MLStrategy(model, scaler, feature_columns)

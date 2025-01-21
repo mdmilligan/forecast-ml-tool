@@ -138,26 +138,24 @@ class Backtester:
     
     def plot_results(self, strategy_returns, benchmark_returns, metrics, confidence_scores=None):
         """Plot backtest results with confidence visualization"""
-        plt.figure(figsize=(12, 8))
-        
-        # Create subplots
-        ax1 = plt.subplot(2, 1, 1)
+        fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 8), sharex=True)
         
         # Plot strategy vs benchmark
         ax1.plot(strategy_returns, label='Strategy')
         ax1.plot(benchmark_returns, label='Benchmark (Buy & Hold)')
+        ax1.set_title(f"Backtest Results\nAnnualized Return: {metrics['annualized_return']:.2%}")
+        ax1.set_ylabel('Portfolio Value')
+        ax1.legend()
+        ax1.grid(True)
         
         # Add confidence visualization if available
         if confidence_scores is not None:
-            ax2 = plt.subplot(2, 1, 2, sharex=ax1)
             ax2.plot(confidence_scores, color='purple', alpha=0.6, label='Confidence')
             ax2.axhline(y=0.7, color='red', linestyle='--', label='Confidence Threshold')
             ax2.set_ylabel('Confidence')
+            ax2.set_xlabel('Days')
             ax2.legend()
-        plt.title(f"Backtest Results\nAnnualized Return: {metrics['annualized_return']:.2%}")
-        plt.xlabel('Days')
-        plt.ylabel('Portfolio Value')
-        plt.legend()
+            ax2.grid(True)
         
         # Add metrics text box
         metrics_text = "\n".join([
@@ -171,11 +169,12 @@ class Backtester:
             f"Avg Position Size: {metrics['avg_position_size']:.1%}",
             f"Profit Factor: {metrics['profit_factor']:.2f}"
         ])
-        plt.text(0.05, 0.95, metrics_text, 
-                transform=plt.gca().transAxes,
+        ax1.text(0.02, 0.98, metrics_text, 
+                transform=ax1.transAxes,
                 verticalalignment='top',
                 bbox=dict(boxstyle='round', facecolor='white', alpha=0.8))
         
+        plt.tight_layout()
         plt.show()
 
 def run_backtest(df, signals, confidence_scores=None):
@@ -202,8 +201,7 @@ def run_backtest(df, signals, confidence_scores=None):
         trade_stats
     )
     
-    # Plot results in a new figure
-    plt.figure()
+    # Plot results
     backtester.plot_results(strategy_returns, benchmark_returns, metrics, confidence_scores)
     
     return metrics
