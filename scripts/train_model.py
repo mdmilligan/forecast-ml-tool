@@ -41,7 +41,8 @@ def prepare_features(df):
     
     # Create feature matrix and target
     X = df[feature_columns]
-    y = df['spy_close'].shift(-1) / df['spy_close'] - 1  # Next period's return
+    # Use log returns as target for better numerical stability
+    y = np.log(df['spy_close'].shift(-1) / df['spy_close'])  # Next period's log return
     
     # Drop rows with missing values (from indicator calculations)
     valid_idx = X.notna().all(axis=1) & y.notna()
@@ -56,14 +57,15 @@ def prepare_features(df):
 def train_model(X_train, y_train):
     """Train and save the model with improved parameters"""
     model = RandomForestRegressor(
-        n_estimators=200,
-        max_depth=15,
-        min_samples_split=5,
-        min_samples_leaf=2,
-        max_features='sqrt',
+        n_estimators=300,
+        max_depth=20,
+        min_samples_split=3,
+        min_samples_leaf=1,
+        max_features=0.5,  # Use half of features for each split
         random_state=42,
         n_jobs=-1,
-        verbose=1
+        verbose=1,
+        max_samples=0.8  # Use bootstrap sampling
     )
     
     # Fit model with early stopping if possible
@@ -119,23 +121,38 @@ if __name__ == "__main__":
     print("\nTop 10 Feature Importances:")
     print(feature_importance_df.head(10))
     
-    # Generate signals from predictions
-    signals = pd.Series(np.where(y_pred > 0.005, 1, np.where(y_pred < -0.005, -1, 0)),
+    # Generate signals using more sensitive thresholds
+    signals = pd.Series(np.where(y_pred > 0.0025, 1, np.where(y_pred < -0.0025, -1, 0)),
                        index=df.index[train_size:train_size+len(y_test)])
     
-    # Run backtest
-    from backtest import run_backtest
-    test_df = df.iloc[train_size:train_size+len(y_test)]
-    backtest_metrics = run_backtest(test_df, signals)
+    # Initialize backtest metrics
+    backtest_metrics = {
+        'status': 'no_signals',
+        'message': 'No valid signals generated for backtesting'
+    }
     
-    # Save test predictions
-    test_results = pd.DataFrame({
-        'Actual': y_test,
-        'Predicted': y_pred,
-        'Signal': signals
-    }, index=df.index[train_size:train_size+len(y_test)])
+    # Run backtest only if we have valid signals
+    if signals.abs().sum() > 0:
+        from backtest import run_backtest
+        test_df = df.iloc[train_size:train_size+len(y_test)]
+        backtest_metrics = run_backtest(test_df, signals)
+        
+        # Save test predictions
+        test_results = pd.DataFrame({
+            'Actual': y_test,
+            'Predicted': y_pred,
+            'Signal': signals
+        }, index=df.index[train_size:train_size+len(y_test)])
+        
+        try:
+            test_results.to_csv('data/test_predictions.csv')
+        except PermissionError:
+            print("Warning: Could not save predictions due to permission error")
+            backtest_metrics['status'] = 'error'
+            backtest_metrics['message'] = 'Could not save predictions'
+    else:
+        print("Warning: No valid signals generated for backtesting")
     
-    test_results.to_csv('data/test_predictions.csv')
     print("\nBacktest Metrics:")
     print(backtest_metrics)
     print("\nSaved test predictions to data/test_predictions.csv")

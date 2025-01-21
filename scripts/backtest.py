@@ -52,9 +52,12 @@ class Backtester:
         daily_returns = np.diff(returns) / returns[:-1]
         annualized_vol = daily_returns.std() * np.sqrt(252)
         
-        # Calculate Sharpe ratio
+        # Calculate Sharpe ratio with safety checks
         risk_free_rate = 0.0  # Can be adjusted
-        sharpe_ratio = (annualized_return - risk_free_rate) / annualized_vol
+        if annualized_vol > 0:
+            sharpe_ratio = (annualized_return - risk_free_rate) / annualized_vol
+        else:
+            sharpe_ratio = 0.0
         
         # Calculate max drawdown
         cumulative_max = np.maximum.accumulate(returns)
