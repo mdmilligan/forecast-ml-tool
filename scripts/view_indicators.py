@@ -6,9 +6,9 @@ from data_processing import load_market_data, calculate_technical_indicators
 def plot_indicators(df):
     """Plot current technical indicators using Plotly"""
     # Create subplots with requested indicators
-    fig = make_subplots(rows=10, cols=1, shared_xaxes=True,
-                       vertical_spacing=0.1,
-                       row_heights=[0.3, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1],
+    fig = make_subplots(rows=11, cols=1, shared_xaxes=True,
+                       vertical_spacing=0.05,
+                       row_heights=[0.5, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2],
                        subplot_titles=(
                            'Price and Moving Averages',
                            'BB %B',
@@ -19,7 +19,8 @@ def plot_indicators(df):
                            'ROC',
                            'Fisher Transform',
                            'Distance to MAs',
-                           '5D SMA Slope & Ultimate RSI'
+                           '5D SMA Slope',
+                           'Ultimate RSI'
                        ))
     
     # Price and Moving Averages
@@ -56,13 +57,15 @@ def plot_indicators(df):
     fig.add_trace(go.Scatter(x=df.index, y=df['dist_to_EMA50'], name='Dist to EMA50'), row=9, col=1)
     fig.add_trace(go.Scatter(x=df.index, y=df['dist_to_50day_SMA'], name='Dist to 50D SMA'), row=9, col=1)
     
-    # 5D SMA Slope & Ultimate RSI
+    # 5D SMA Slope
     fig.add_trace(go.Scatter(x=df.index, y=df['slope'], name='5D SMA Slope'), row=10, col=1)
-    fig.add_trace(go.Scatter(x=df.index, y=df['ultimate_rsi'], name='Ultimate RSI'), row=10, col=1)
+    
+    # Ultimate RSI
+    fig.add_trace(go.Scatter(x=df.index, y=df['ultimate_rsi'], name='Ultimate RSI'), row=11, col=1)
     
     # Update layout to only show periods with data
     fig.update_layout(
-        height=1600,  # Increased height to prevent overlap
+        height=2200,  # Increased height to accommodate extra row
         width=1400,
         title_text="Technical Indicators - 30 Minute Intervals",
         showlegend=True,
@@ -94,7 +97,8 @@ def plot_indicators(df):
     fig.update_yaxes(title_text="ROC", row=7, col=1)
     fig.update_yaxes(title_text="Fisher", row=8, col=1)
     fig.update_yaxes(title_text="Distance %", row=9, col=1)
-    fig.update_yaxes(title_text="Slope/RSI", row=10, col=1)
+    fig.update_yaxes(title_text="Slope", row=10, col=1)
+    fig.update_yaxes(title_text="RSI", row=11, col=1)
     
     fig.show()
 
