@@ -8,7 +8,7 @@ def plot_indicators(df):
     # Create subplots with 30-min interval indicators
     fig = make_subplots(rows=5, cols=1, shared_xaxes=True,
                        vertical_spacing=0.1,  # Increased vertical spacing
-                       row_heights=[0.35, 0.15, 0.15, 0.25, 0.1],  # Adjusted row heights
+                       row_heights=[0.4, 0.2, 0.2, 0.4, 0.2],  # Adjusted row heights
                        subplot_titles=(
                            'Price and Moving Averages',
                            'RSI',
@@ -27,15 +27,6 @@ def plot_indicators(df):
     fig.add_hline(y=70, line_dash="dot", line_color="red", row=2, col=1)
     fig.add_hline(y=30, line_dash="dot", line_color="green", row=2, col=1)
     fig.update_yaxes(range=[0, 100], row=2, col=1)  # Fix RSI range
-
-
-    fig.add_trace(
-        go.Scatter(x=df.index, y=df['rsi'], name='RSI', line=dict(color='purple')), 
-        row=2, col=1
-    )
-    # Add RSI reference lines
-    fig.add_hline(y=70, line_dash="dot", line_color="red", row=2, col=1)
-    fig.add_hline(y=30, line_dash="dot", line_color="green", row=2, col=1)
     
     # MACD
     fig.add_trace(go.Scatter(x=df.index, y=df['macd'], name='MACD'), row=3, col=1)
@@ -54,12 +45,9 @@ def plot_indicators(df):
         showlegend=True,
         xaxis=dict(
             tickformat='%Y-%m-%d %H:%M',
-            rangeslider=dict(visible=True),
             range=[df.index.min(), df.index.max()],  # Set range to actual data bounds
             autorange=False
         ),
-        xaxis_rangeslider_visible=True,
-        xaxis_rangeslider_thickness=0.08,  # Thinner range slider
         margin=dict(l=50, r=50, t=100, b=100)  # Increased bottom margin
     )
     
