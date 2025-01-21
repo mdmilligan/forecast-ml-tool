@@ -16,10 +16,25 @@ class Backtester:
         position = 0
         returns = []
         trade_count = 0
+        winning_trades = 0
+        losing_trades = 0
+        total_position_size = 0
         
         # If no confidence scores provided, use full position
         if confidence_scores is None:
             confidence_scores = np.ones(len(signals))
+            
+        # Track trade statistics
+        trade_stats = {
+            'entry_dates': [],
+            'exit_dates': [],
+            'returns': [],
+            'durations': [],
+            'position_sizes': []
+        }
+        
+        # Initialize previous price
+        prev_price = df['spy_close'].iloc[0]
         
         # Calculate daily returns
         for i in range(1, len(df)):
@@ -32,6 +47,29 @@ class Backtester:
             target_position = signal * confidence
             position_change = target_position - position
             
+            # Calculate daily return
+            daily_return = (current_price - prev_price) / prev_price * position
+            portfolio_value *= (1 + daily_return)
+            returns.append(portfolio_value)
+            
+            # Track trade statistics when entering/exiting positions
+            if position_change != 0:
+                if position != 0:  # Exiting a position
+                    trade_stats['exit_dates'].append(df.index[i])
+                    trade_stats['returns'].append(daily_return)
+                    trade_stats['durations'].append(len(trade_stats['entry_dates']) - len(trade_stats['exit_dates']))
+                    trade_stats['position_sizes'].append(abs(position))
+                    
+                    if daily_return > 0:
+                        winning_trades += 1
+                    else:
+                        losing_trades += 1
+                
+                if target_position != 0:  # Entering a position
+                    trade_stats['entry_dates'].append(df.index[i])
+                
+                total_position_size += abs(position_change)
+            
             # Calculate return with commission
             if position_change != 0:
                 trade_count += 1
@@ -41,18 +79,27 @@ class Backtester:
             # Update position
             position = signal
             
-            # Calculate daily return
-            daily_return = (current_price - prev_price) / prev_price * position
-            portfolio_value *= (1 + daily_return)
-            returns.append(portfolio_value)
-            
-        return np.array(returns), trade_count
+        return (
+            np.array(returns), 
+            trade_count,
+            winning_trades,
+            losing_trades,
+            total_position_size,
+            trade_stats
+        )
     
-    def calculate_metrics(self, returns, benchmark_returns, trade_count):
-        """Calculate performance metrics"""
+    def calculate_metrics(self, returns, benchmark_returns, trade_count, winning_trades, losing_trades, total_position_size, trade_stats):
+        """Calculate enhanced performance metrics"""
         # Calculate returns
         total_return = returns[-1] / self.initial_capital - 1
         annualized_return = (1 + total_return) ** (252/len(returns)) - 1
+        
+        # Calculate trade statistics
+        win_rate = winning_trades / trade_count if trade_count > 0 else 0
+        avg_trade_duration = np.mean(trade_stats['durations']) if trade_stats['durations'] else 0
+        avg_position_size = total_position_size / trade_count if trade_count > 0 else 0
+        avg_winning_return = np.mean([r for r in trade_stats['returns'] if r > 0]) if winning_trades > 0 else 0
+        avg_losing_return = np.mean([r for r in trade_stats['returns'] if r < 0]) if losing_trades > 0 else 0
         
         # Calculate volatility
         daily_returns = np.diff(returns) / returns[:-1]
@@ -80,7 +127,13 @@ class Backtester:
             'sharpe_ratio': sharpe_ratio,
             'max_drawdown': max_drawdown,
             'benchmark_return': benchmark_total_return,
-            'trade_count': trade_count
+            'trade_count': trade_count,
+            'win_rate': win_rate,
+            'avg_trade_duration': avg_trade_duration,
+            'avg_position_size': avg_position_size,
+            'avg_winning_return': avg_winning_return,
+            'avg_losing_return': avg_losing_return,
+            'profit_factor': abs(avg_winning_return / avg_losing_return) if avg_losing_return != 0 else 0
         }
     
     def plot_results(self, strategy_returns, benchmark_returns, metrics, confidence_scores=None):
@@ -112,7 +165,11 @@ class Backtester:
             f"Annualized Vol: {metrics['annualized_volatility']:.2%}",
             f"Sharpe Ratio: {metrics['sharpe_ratio']:.2f}",
             f"Max Drawdown: {metrics['max_drawdown']:.2%}",
-            f"Trades: {metrics['trade_count']}"
+            f"Trades: {metrics['trade_count']}",
+            f"Win Rate: {metrics['win_rate']:.1%}",
+            f"Avg Trade Duration: {metrics['avg_trade_duration']:.1f} days",
+            f"Avg Position Size: {metrics['avg_position_size']:.1%}",
+            f"Profit Factor: {metrics['profit_factor']:.2f}"
         ])
         plt.text(0.05, 0.95, metrics_text, 
                 transform=plt.gca().transAxes,
@@ -126,15 +183,27 @@ def run_backtest(df, signals, confidence_scores=None):
     backtester = Backtester()
     
     # Calculate strategy returns
-    strategy_returns, trade_count = backtester.calculate_returns(df, signals, confidence_scores)
+    # Calculate strategy returns and get trade statistics
+    strategy_returns, trade_count, winning_trades, losing_trades, total_position_size, trade_stats = (
+        backtester.calculate_returns(df, signals, confidence_scores)
+    )
     
     # Calculate benchmark returns (buy & hold)
     benchmark_returns = df['spy_close'].values / df['spy_close'].iloc[0] * backtester.initial_capital
     
-    # Calculate performance metrics
-    metrics = backtester.calculate_metrics(strategy_returns, benchmark_returns, trade_count)
+    # Calculate performance metrics with all required parameters
+    metrics = backtester.calculate_metrics(
+        strategy_returns, 
+        benchmark_returns, 
+        trade_count,
+        winning_trades,
+        losing_trades,
+        total_position_size,
+        trade_stats
+    )
     
-    # Plot results
+    # Plot results in a new figure
+    plt.figure()
     backtester.plot_results(strategy_returns, benchmark_returns, metrics, confidence_scores)
     
     return metrics

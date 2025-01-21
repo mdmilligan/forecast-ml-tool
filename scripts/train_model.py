@@ -6,6 +6,7 @@ from sklearn.metrics import mean_squared_error, r2_score
 import joblib
 import pandas as pd
 from datetime import datetime
+import matplotlib.pyplot as plt
 from data_processing import load_market_data, calculate_technical_indicators
 
 def prepare_features(df):
@@ -127,15 +128,28 @@ if __name__ == "__main__":
     print(f"Mean Squared Error: {mse:.4f}")
     print(f"R-squared: {r2:.4f}")
     
-    # Feature importance analysis
+    # Enhanced feature importance analysis
     importances = model.feature_importances_
+    std = np.std([tree.feature_importances_ for tree in model.estimators_], axis=0)
     feature_importance_df = pd.DataFrame({
         'Feature': feature_columns,
-        'Importance': importances
+        'Importance': importances,
+        'Std': std
     }).sort_values('Importance', ascending=False)
     
-    print("\nTop 10 Feature Importances:")
-    print(feature_importance_df.head(10))
+    # Plot feature importance with error bars
+    fig, ax = plt.subplots(figsize=(10, 8))
+    feature_importance_df.plot.barh(x='Feature', y='Importance', xerr='Std', 
+                                  title='Feature Importance with Standard Deviation',
+                                  legend=False, ax=ax)
+    ax.set_xlabel('Importance')
+    ax.set_ylabel('Feature')
+    plt.tight_layout()
+    plt.savefig('data/feature_importance.png')
+    
+    # Print all feature importances
+    print("\nAll Feature Importances:")
+    print(feature_importance_df.sort_values('Importance', ascending=False))
     
     # Create ML strategy instance
     strategy = MLStrategy(model, scaler, feature_columns)
