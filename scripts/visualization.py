@@ -1,7 +1,7 @@
 import pandas as pd
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
-from data_processing import load_market_data, calculate_technical_indicators
+from data_process import load_market_data, calculate_technical_indicators
 
 def plot_indicators(df):
     """Plot current technical indicators using Plotly"""
@@ -106,9 +106,9 @@ def plot_indicators(df):
 if __name__ == "__main__":
     print("Fetching and displaying current indicators...")
     
-    # Fetch and calculate indicators with updated date range
-    df = load_market_data(start_date='2010-01-01', end_date='2025-01-20')
+    # Fetch and calculate indicators for most recent data
+    df = load_market_data(start_date='2024-12-01', end_date='2025-01-20')
     df = calculate_technical_indicators(df)
     
     # Plot current indicators
-    plot_indicators(df[-200:])  # Show last 200 periods (100 hours)
+    plot_indicators(df)  # Show all available recent data
