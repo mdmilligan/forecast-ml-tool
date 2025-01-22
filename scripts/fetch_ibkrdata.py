@@ -78,11 +78,11 @@ def get_all_historical_data(ib, symbol, conn, bar_size='30 mins', start_date=Non
         
         while current_end > start_date:
             try:
-                print(f"Requesting chunk ending {end_date.strftime('%Y-%m-%d')}")
+                print(f"Requesting chunk ending {current_end.strftime('%Y-%m-%d')}")
                 bars = get_historical_data_chunk(
                     ib, 
                     contract, 
-                    end_date.strftime('%Y%m%d %H:%M:%S'), 
+                    current_end.strftime('%Y%m%d %H:%M:%S'), 
                     bar_size
                 )
                 
@@ -93,8 +93,8 @@ def get_all_historical_data(ib, symbol, conn, bar_size='30 mins', start_date=Non
                 else:
                     print(f"No data received for chunk ending {end_date.strftime('%Y-%m-%d')}")
                 
-                # Move end_date back by 1 month
-                end_date = end_date - timedelta(days=30)
+                # Move current_end back by 1 month
+                current_end = current_end - timedelta(days=30)
                 
                 # Add a delay between requests to avoid pacing violations
                 ib.sleep(3)
@@ -171,7 +171,20 @@ def main():
         else:
             raise ConnectionError(f"Could not connect to IBKR on any port after {len(ports)} attempts")
         
-        print(f"\nFetching {args.months} months of {args.bar_size} data for {args.symbol}...")
+        # Calculate and display the timeframe
+        start_dt = datetime.strptime(args.start_date, '%Y-%m-%d') if args.start_date else None
+        end_dt = datetime.strptime(args.end_date, '%Y-%m-%d') if args.end_date else None
+        
+        if start_dt and end_dt:
+            timeframe = f"from {start_dt.strftime('%Y-%m-%d')} to {end_dt.strftime('%Y-%m-%d')}"
+        elif start_dt:
+            timeframe = f"from {start_dt.strftime('%Y-%m-%d')} to present"
+        elif end_dt:
+            timeframe = f"up to {end_dt.strftime('%Y-%m-%d')}"
+        else:
+            timeframe = "for the last 3 years"
+            
+        print(f"\nFetching {args.bar_size} data for {args.symbol} {timeframe}...")
         df = get_all_historical_data(
             ib, 
             args.symbol, 
