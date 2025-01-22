@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 import joblib
-from train_model import fetch_data, calculate_technical_indicators
+from MarketForecastTool.scripts.model_train import fetch_data, calculate_technical_indicators
 from datetime import datetime
 
 class MLStrategy:
