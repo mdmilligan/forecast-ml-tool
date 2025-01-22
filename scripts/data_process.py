@@ -8,7 +8,7 @@ import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-def load_market_data(start_date='2010-01-01', end_date='2024-01-01'):
+def load_market_data(start_date='2013-01-01', end_date='2024-12-31'):
     """Load and preprocess historical market data from database"""
     try:
         conn = sqlite3.connect('data/marketdata.db')
