@@ -1,50 +1,23 @@
 import pandas as pd
 import numpy as np
 import joblib
-from MarketForecastTool.scripts.model_train import fetch_data, calculate_technical_indicators
 from datetime import datetime
-
-class MLStrategy:
-    def __init__(self, model, scaler, feature_columns):
-        self.model = model
-        self.scaler = scaler
-        self.feature_columns = feature_columns
-        
-    def calculate_confidence_score(self, X_scaled):
-        """Calculate confidence score based on tree agreement and prediction magnitude"""
-        predictions = np.array([tree.predict(X_scaled) 
-                              for tree in self.model.estimators_])
-        mean_pred = predictions.mean(axis=0)
-        tree_std = predictions.std(axis=0)
-        agreement_score = 1 / (1 + tree_std)
-        magnitude_score = np.abs(mean_pred) / np.std(mean_pred)
-        confidence = (agreement_score * magnitude_score)
-        confidence = (confidence - confidence.min()) / (confidence.max() - confidence.min())
-        return confidence, mean_pred
-        
-    def generate_signals(self, df, max_position=1.0, min_confidence=0.2):
-        """Generate trading signals with position sizing based on confidence"""
-        X = df[self.feature_columns]
-        X_scaled = self.scaler.transform(X)
-        confidence_scores, predictions = self.calculate_confidence_score(X_scaled)
-        
-        signals = pd.Series(index=df.index, data=0.0)
-        for i in range(len(predictions)):
-            if predictions[i] > 0.001:  # Long signal
-                if confidence_scores[i] > min_confidence:
-                    signals.iloc[i] = max_position * confidence_scores[i]
-            elif predictions[i] < -0.001:  # Short signal
-                if confidence_scores[i] > min_confidence:
-                    signals.iloc[i] = -max_position * confidence_scores[i]
-        
-        return signals, predictions, confidence_scores
+from scripts.data_fetch import fetch_data
+from scripts.data_process import calculate_technical_indicators
+from scripts.strategy import MLStrategy
 
 def generate_predictions(df, start_date, end_date):
     """Generate predictions for specified date range"""
-    # Load model artifacts
-    model = joblib.load('data/model.pkl')
-    scaler = joblib.load('data/scaler.pkl')
-    feature_columns = joblib.load('data/feature_columns.pkl')
+    try:
+        # Load model artifacts
+        model = joblib.load('models/model.pkl')
+        scaler = joblib.load('models/scaler.pkl')
+        feature_columns = joblib.load('models/feature_columns.pkl')
+    except FileNotFoundError as e:
+        raise FileNotFoundError(
+            "Model files not found. Please ensure you have trained the model first. "
+            f"Required files: models/model.pkl, models/scaler.pkl, models/feature_columns.pkl. Error: {str(e)}"
+        )
     
     # Filter data for specified date range
     df = df.loc[start_date:end_date]

@@ -170,7 +170,7 @@ if __name__ == "__main__":
     
     # Run backtest only if we have valid signals
     if signals.abs().sum() > 0:
-        from MarketForecastTool.scripts.util_backtest import run_backtest
+        from scripts.backtest import run_backtest
         test_df = df.iloc[train_size:train_size+len(y_test)]
         backtest_metrics = run_backtest(test_df, signals, confidence_scores)
         
