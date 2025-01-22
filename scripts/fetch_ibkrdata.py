@@ -54,8 +54,23 @@ def get_all_historical_data(ib, symbol, conn, bar_size='30 mins', months=36):
             
         print(f"\nRequesting historical data for {symbol}...")
         
-        # Start with current date
-        end_date = datetime.now()
+        # Check if table exists and get latest date
+        table_name = f"stock_data_{symbol.lower()}"
+        create_table_if_not_exists(conn, symbol)
+        
+        # Get existing data's latest date if any
+        cursor = conn.cursor()
+        cursor.execute(f"SELECT MAX(date) FROM {table_name}")
+        latest_date = cursor.fetchone()[0]
+        
+        # If we have existing data, start from the day after the latest date
+        if latest_date:
+            end_date = datetime.strptime(latest_date, '%Y-%m-%d %H:%M:%S') + timedelta(days=1)
+            print(f"Found existing data up to {latest_date}, starting from {end_date}")
+        else:
+            end_date = datetime.now()
+            print("No existing data found, starting from current date")
+        
         all_bars = []
         chunks_received = 0
         
@@ -96,11 +111,9 @@ def get_all_historical_data(ib, symbol, conn, bar_size='30 mins', months=36):
             print(f"\nTotal bars collected for {symbol}: {len(df)}")
             print(f"Date range: {df['date'].min()} to {df['date'].max()}")
             
-            # Save to database
-            create_table_if_not_exists(conn, symbol)
-            table_name = f"stock_data_{symbol.lower()}"
-            df.to_sql(table_name, conn, if_exists='replace', index=False)
-            print(f"Data saved to database table: {table_name}")
+            # Save to database - append if data exists
+            df.to_sql(table_name, conn, if_exists='append', index=False)
+            print(f"Data appended to database table: {table_name}")
             
             return df
             
