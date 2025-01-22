@@ -113,10 +113,49 @@ def get_all_historical_data(ib, symbol, conn, bar_size='30 mins', start_date=Non
             df = df.drop_duplicates(subset=['date'])
             df = df.sort_values('date')
             
-            # Convert date column to datetime and filter
+            # Convert date column to datetime
             df['date'] = pd.to_datetime(df['date'])
-            df = df[(df['date'].dt.tz_localize(None) >= start_date) & 
-                   (df['date'].dt.tz_localize(None) <= end_date)]
+            
+            # Debug print before filtering
+            print("\nRaw data date range:", df['date'].min(), "to", df['date'].max())
+            
+            # Convert to naive datetime for comparison
+            df['date_naive'] = df['date'].dt.tz_localize(None)
+            
+            # Debug print naive dates
+            print("Naive date range:", df['date_naive'].min(), "to", df['date_naive'].max())
+            
+            # Filter with inclusive end date
+            mask = (df['date_naive'] >= start_date) & (df['date_naive'] <= end_date + timedelta(days=1))
+            df_filtered = df[mask]
+            
+            # Debug print filtered dates
+            print("Filtered date range:", df_filtered['date_naive'].min(), "to", df_filtered['date_naive'].max())
+            
+            # Check if end date exists
+            if end_date not in df_filtered['date_naive'].dt.date.values:
+                print(f"\nWarning: End date {end_date.date()} not found in data")
+                # Try to fetch the missing day specifically
+                try:
+                    print(f"Attempting to fetch missing date: {end_date.date()}")
+                    missing_bars = get_historical_data_chunk(
+                        ib, 
+                        contract, 
+                        (end_date + timedelta(days=1)).strftime('%Y%m%d %H:%M:%S'), 
+                        bar_size,
+                        duration='1 D'
+                    )
+                    if missing_bars:
+                        missing_df = util.df(missing_bars)
+                        missing_df['date'] = pd.to_datetime(missing_df['date'])
+                        missing_df['date_naive'] = missing_df['date'].dt.tz_localize(None)
+                        df_filtered = pd.concat([df_filtered, missing_df])
+                        print(f"Added {len(missing_df)} bars for {end_date.date()}")
+                except Exception as e:
+                    print(f"Error fetching missing date: {str(e)}")
+            
+            # Drop the temporary naive date column
+            df = df_filtered.drop(columns=['date_naive'])
             
             print(f"\nTotal bars collected for {symbol}: {len(df)}")
             print(f"Date range: {df['date'].min()} to {df['date'].max()}")
