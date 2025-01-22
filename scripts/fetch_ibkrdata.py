@@ -113,8 +113,10 @@ def get_all_historical_data(ib, symbol, conn, bar_size='30 mins', start_date=Non
             df = df.drop_duplicates(subset=['date'])
             df = df.sort_values('date')
             
-            # Filter to only keep data within the requested date range
-            df = df[(df['date'] >= start_date) & (df['date'] <= end_date)]
+            # Convert date column to datetime and filter
+            df['date'] = pd.to_datetime(df['date'])
+            df = df[(df['date'].dt.tz_localize(None) >= start_date) & 
+                   (df['date'].dt.tz_localize(None) <= end_date)]
             
             print(f"\nTotal bars collected for {symbol}: {len(df)}")
             print(f"Date range: {df['date'].min()} to {df['date'].max()}")
