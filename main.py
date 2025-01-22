@@ -24,10 +24,10 @@ logger = logging.getLogger(__name__)
 def parse_args():
     """Parse command line arguments"""
     parser = argparse.ArgumentParser(description='Trading System')
-    parser.add_argument('--start-date', type=str, default='2010-01-01',
-                       help='Start date for backtesting (YYYY-MM-DD)')
-    parser.add_argument('--end-date', type=str, default='2024-01-01',
-                       help='End date for backtesting (YYYY-MM-DD)')
+    parser.add_argument('--start-date', type=str, default='2013-01-01',
+                       help='Start date for training data (YYYY-MM-DD)')
+    parser.add_argument('--end-date', type=str, default='2024-12-31',
+                       help='End date for testing data (YYYY-MM-DD)')
     parser.add_argument('--train', action='store_true',
                        help='Train new model')
     parser.add_argument('--backtest', action='store_true',

@@ -108,10 +108,12 @@ if __name__ == "__main__":
     df = calculate_technical_indicators(df)
     X, y, scaler, feature_columns, valid_idx = prepare_features(df)
     
-    # Train/test split
-    train_size = int(len(df) * 0.8)
-    X_train, X_test = X[:train_size], X[train_size:]
-    y_train, y_test = y[:train_size], y[train_size:]
+    # Split data - train on 2013-2023, test on 2024
+    train_mask = df.index < '2024-01-01'
+    test_mask = df.index >= '2024-01-01'
+    
+    X_train, X_test = X[train_mask], X[test_mask]
+    y_train, y_test = y[train_mask], y[test_mask]
     
     # Train and save model
     model = train_model(X_train, y_train)
@@ -159,7 +161,7 @@ if __name__ == "__main__":
                 0
             )
         ),
-        index=df.index[train_size:train_size+len(y_test)]
+        index=df.index[test_mask]
     )
     
     # Initialize backtest metrics
@@ -171,7 +173,7 @@ if __name__ == "__main__":
     # Run backtest only if we have valid signals
     if signals.abs().sum() > 0:
         from scripts.backtest import run_backtest
-        test_df = df.iloc[train_size:train_size+len(y_test)]
+        test_df = df[test_mask]
         backtest_metrics = run_backtest(test_df, signals, confidence_scores)
         
         # Save test predictions
@@ -179,7 +181,7 @@ if __name__ == "__main__":
             'Actual': y_test,
             'Predicted': y_pred,
             'Signal': signals
-        }, index=df.index[train_size:train_size+len(y_test)])
+        }, index=df.index[test_mask])
         
         try:
             test_results.to_csv('data/test_predictions.csv')
