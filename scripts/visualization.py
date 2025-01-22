@@ -25,8 +25,12 @@ def plot_indicators(df):
     
     # Price and Moving Averages
     fig.add_trace(go.Scatter(x=df.index, y=df['spy_close'], name='Price'), row=1, col=1)
-    # fig.add_trace(go.Scatter(x=df.index, y=df['SMA20'], name='SMA 20'), row=1, col=1)
-    # fig.add_trace(go.Scatter(x=df.index, y=df['EMA50'], name='EMA 50'), row=1, col=1)
+    fig.add_trace(go.Scatter(x=df.index, y=df['SMA5'], name='5D SMA', line=dict(color='blue', width=1)), row=1, col=1)
+    fig.add_trace(go.Scatter(x=df.index, y=df['SMA20'], name='20D SMA', line=dict(color='orange', width=1)), row=1, col=1)
+    fig.add_trace(go.Scatter(x=df.index, y=df['SMA50'], name='50D SMA', line=dict(color='green', width=1)), row=1, col=1)
+    fig.add_trace(go.Scatter(x=df.index, y=df['SMA100'], name='100D SMA', line=dict(color='purple', width=1)), row=1, col=1)
+    fig.add_trace(go.Scatter(x=df.index, y=df['SMA150'], name='150D SMA', line=dict(color='brown', width=1)), row=1, col=1)
+    fig.add_trace(go.Scatter(x=df.index, y=df['SMA200'], name='200D SMA', line=dict(color='pink', width=1)), row=1, col=1)
     
     # BB %B
     fig.add_trace(go.Scatter(x=df.index, y=df['bb_percent_b'], name='BB %B'), row=2, col=1)
@@ -55,7 +59,7 @@ def plot_indicators(df):
     # Distance to MAs
     fig.add_trace(go.Scatter(x=df.index, y=df['dist_to_EMA21'], name='Dist to EMA21'), row=9, col=1)
     fig.add_trace(go.Scatter(x=df.index, y=df['dist_to_EMA50'], name='Dist to EMA50'), row=9, col=1)
-    fig.add_trace(go.Scatter(x=df.index, y=df['dist_to_50day_SMA'], name='Dist to 50D SMA'), row=9, col=1)
+    fig.add_trace(go.Scatter(x=df.index, y=df['dist_to_5day_SMA'], name='Dist to 5D SMA'), row=9, col=1)
     
     # 5D SMA Slope
     fig.add_trace(go.Scatter(x=df.index, y=df['slope'], name='5D SMA Slope'), row=10, col=1)
