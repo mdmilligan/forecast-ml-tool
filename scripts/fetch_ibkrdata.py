@@ -75,10 +75,14 @@ def get_all_historical_data(ib, symbol, conn, bar_size='30 mins', start_date=Non
         
         all_bars = []
         current_end = end_date
+        chunks_received = 0
+        
+        print(f"Fetching data from {start_date.strftime('%Y-%m-%d')} to {end_date.strftime('%Y-%m-%d')}")
         
         while current_end > start_date:
             try:
-                print(f"Requesting chunk ending {current_end.strftime('%Y-%m-%d')}")
+                chunk_start = current_end - timedelta(days=30)
+                print(f"Requesting chunk {chunks_received + 1}: {chunk_start.strftime('%Y-%m-%d')} to {current_end.strftime('%Y-%m-%d')}")
                 bars = get_historical_data_chunk(
                     ib, 
                     contract, 
@@ -91,7 +95,7 @@ def get_all_historical_data(ib, symbol, conn, bar_size='30 mins', start_date=Non
                     chunks_received += 1
                     print(f"Received {len(bars)} bars for chunk {chunks_received}")
                 else:
-                    print(f"No data received for chunk ending {end_date.strftime('%Y-%m-%d')}")
+                    print(f"No data received for chunk {chunks_received + 1}")
                 
                 # Move current_end back by 1 month
                 current_end = current_end - timedelta(days=30)
