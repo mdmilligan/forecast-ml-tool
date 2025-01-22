@@ -73,8 +73,20 @@ pip install -r requirements.txt
 
 ### Data Collection
 ```bash
-# Fetch 3 years of 30-minute SPY data
-python scripts/fetch_ibkrdata.py -s SPY -b "30 mins" -m 36
+# Fetch historical data with various options
+python scripts/fetch_ibkrdata.py -s SYMBOL -b BAR_SIZE [--start-date YYYY-MM-DD] [--end-date YYYY-MM-DD]
+
+# Example: Fetch 30-minute SPY data from 2013-01-01 to 2013-03-25
+python scripts/fetch_ibkrdata.py -s SPY -b "30 mins" --start-date 2013-01-01 --end-date 2013-03-25
+
+# Example: Fetch 1-hour VIX data for last 3 years
+python scripts/fetch_ibkrdata.py -s VIX -b "1 hour"
+
+# Arguments:
+#   -s, --symbol       Stock symbol to fetch (e.g., SPY, VIX, UUP)
+#   -b, --bar-size     Bar size for historical data (1 min, 5 mins, 15 mins, 30 mins, 1 hour, 1 day)
+#   --start-date       Start date for historical data (YYYY-MM-DD)
+#   --end-date         End date for historical data (YYYY-MM-DD). If not provided, collects up to most recent available data
 ```
 
 ### Model Training
