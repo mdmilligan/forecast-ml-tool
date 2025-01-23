@@ -1,6 +1,18 @@
 import pandas as pd
 import numpy as np
+import matplotlib.pyplot as plt
 from sklearn.ensemble import RandomForestRegressor
+from sklearn.exceptions import ConvergenceWarning
+from pathlib import Path
+import logging
+import traceback
+from datetime import datetime
+from sklearn.metrics import (mean_squared_error, r2_score, 
+                            mean_absolute_error, explained_variance_score)
+
+# Initialize logger
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import mean_squared_error, r2_score
 import joblib
@@ -55,13 +67,28 @@ def prepare_features(df):
     feature_columns.extend(['fisher_cross_above', 'fisher_cross_below', 
                           'ursi_cross_above', 'ursi_cross_below'])
 
-    # Create feature matrix and target
+    # Create feature matrix
     X = df[feature_columns]
-    # Use log returns as target for better numerical stability
-    y = np.log(df['spy_close'].shift(-1) / df['spy_close'])  # Next period's log return
     
-    # Drop rows with missing values (from indicator calculations)
-    valid_idx = X.notna().all(axis=1) & y.notna()
+    # Create multi-output target
+    # Next period's log return (original target)
+    y_return = np.log(df['spy_close'].shift(-1) / df['spy_close'])
+    
+    # Create exit targets (1 = exit, 0 = hold)
+    y_exit_long = ((df['spy_low'].shift(-1) <= df['stop_loss_long']) | 
+                  (df['spy_high'].shift(-1) >= df['take_profit_long'])).astype(int)
+    y_exit_short = ((df['spy_high'].shift(-1) >= df['stop_loss_short']) | 
+                   (df['spy_low'].shift(-1) <= df['take_profit_short'])).astype(int)
+    
+    # Combine into multi-output target
+    y = pd.DataFrame({
+        'return': y_return,
+        'exit_long': y_exit_long,
+        'exit_short': y_exit_short
+    })
+    
+    # Drop rows with missing values
+    valid_idx = X.notna().all(axis=1) & y.notna().all(axis=1)
     X = X[valid_idx]
     y = y[valid_idx]
     
@@ -90,10 +117,18 @@ def export_predictions(df, model_path='data/model.pkl', scaler_path='data/scaler
                       feature_columns_path='data/feature_columns.pkl'):
     """Export predictions using existing trained model"""
     try:
-        # Load trained model and artifacts
-        model = joblib.load(model_path)
-        scaler = joblib.load(scaler_path)
-        feature_columns = joblib.load(feature_columns_path)
+        # Validate model files exist
+        for path in [model_path, scaler_path, feature_columns_path]:
+            if not Path(path).exists():
+                raise FileNotFoundError(f"Model artifact not found: {path}")
+                
+        # Load trained model and artifacts with validation
+        try:
+            model = joblib.load(model_path)
+            scaler = joblib.load(scaler_path)
+            feature_columns = joblib.load(feature_columns_path)
+        except Exception as e:
+            raise ValueError(f"Error loading model artifacts: {str(e)}")
         
         # Prepare features
         X, y, _, _, valid_idx = prepare_features(df)
@@ -139,8 +174,21 @@ def export_predictions(df, model_path='data/model.pkl', scaler_path='data/scaler
         
         return test_results
         
+    except MemoryError:
+        logger.error("Out of memory - reduce data size or use smaller model")
+        raise
+    except ConvergenceWarning:
+        logger.warning("Model failed to converge - check learning rate")
+        raise
+    except FileNotFoundError as e:
+        logger.error(f"File not found: {str(e)}")
+        raise
+    except ValueError as e:
+        logger.error(f"Data validation error: {str(e)}")
+        raise
     except Exception as e:
-        print(f"\nError exporting predictions: {str(e)}")
+        logger.error(f"Unexpected error exporting predictions: {str(e)}")
+        logger.error(traceback.format_exc())
         raise
 
 def train_model(X_train, y_train):
@@ -180,8 +228,10 @@ def train_model(X_train, y_train):
         # Combine metrics
         return -(mse - 0.2 * position_reward)  # Negative since we want to maximize
     
-    # Base model with verbose disabled
-    model = RandomForestRegressor(random_state=42, n_jobs=-1, verbose=0)
+    # Base model with multi-output support
+    from sklearn.multioutput import MultiOutputRegressor
+    base_model = RandomForestRegressor(random_state=42, n_jobs=-1, verbose=0)
+    model = MultiOutputRegressor(base_model)
     
     # Hyperparameter grid
     param_dist = {
@@ -266,14 +316,33 @@ if __name__ == "__main__":
     joblib.dump(scaler, 'data/scaler.pkl')
     joblib.dump(feature_columns, 'data/feature_columns.pkl')
     
-    # Evaluate model on test set
+    # Enhanced model evaluation
     y_pred = model.predict(X_test)
-    mse = mean_squared_error(y_test, y_pred)
-    r2 = r2_score(y_test, y_pred)
+    
+    # Calculate multiple metrics
+    metrics = {
+        'train_date': datetime.now().isoformat(),
+        'mse': mean_squared_error(y_test, y_pred),
+        'mae': mean_absolute_error(y_test, y_pred),
+        'r2': r2_score(y_test, y_pred),
+        'explained_variance': explained_variance_score(y_test, y_pred),
+        'num_features': len(feature_columns),
+        'test_set_size': len(X_test)
+    }
+    
+    # Update performance history
+    performance_file = Path('data/performance_history.csv')
+    if performance_file.exists():
+        performance_history = pd.read_csv(performance_file)
+    else:
+        performance_history = pd.DataFrame(columns=metrics.keys())
+        
+    performance_history = performance_history.append(metrics, ignore_index=True)
+    performance_history.to_csv(performance_file, index=False)
     
     print(f"\nModel Evaluation on Test Set:")
-    print(f"Mean Squared Error: {mse:.4f}")
-    print(f"R-squared: {r2:.4f}")
+    print(f"Mean Squared Error: {metrics['mse']:.4f}")
+    print(f"R-squared: {metrics['r2']:.4f}")
     
     # Feature selection based on importance
     importances = model.feature_importances_
@@ -293,9 +362,30 @@ if __name__ == "__main__":
     # Update feature columns
     feature_columns = selected_features
     
-    # Print all feature importances with formatting
-    print("\nAll Feature Importances:")
-    print(feature_importance_df.sort_values('Importance', ascending=False).to_string())
+    # Enhanced feature importance visualization
+    plt.figure(figsize=(12, 8))
+    sorted_features = feature_importance_df.sort_values('Importance', ascending=True)
+    
+    # Create horizontal bar plot
+    plt.barh(sorted_features['Feature'], 
+             sorted_features['Importance'], 
+             xerr=sorted_features['Std'],
+             alpha=0.7)
+    
+    # Add labels and title
+    plt.title('Feature Importance with Standard Deviation', fontsize=14)
+    plt.xlabel('Importance Score', fontsize=12)
+    plt.ylabel('Features', fontsize=12)
+    plt.grid(True, alpha=0.3)
+    
+    # Save high-quality version
+    plt.tight_layout()
+    plt.savefig('data/feature_importance.png', dpi=300, bbox_inches='tight')
+    plt.close()
+    
+    # Print top 20 features
+    print("\nTop 20 Feature Importances:")
+    print(feature_importance_df.nlargest(20, 'Importance').to_string())
     
     # Create ML strategy instance
     strategy = MLStrategy(model, scaler, feature_columns)

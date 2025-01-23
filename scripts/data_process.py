@@ -225,6 +225,13 @@ def calculate_technical_indicators(df: pd.DataFrame, params: dict = None) -> pd.
         # Calculate Ultimate RSI
         df['ultimate_rsi'], df['ultimate_rsi_signal'] = calculate_ultimate_rsi(df)
         
+        # Calculate stop-loss and take-profit levels
+        df['atr_20'] = df['atr'].rolling(window=20).mean()
+        df['stop_loss_long'] = df['spy_low'].rolling(window=5).min() - 1.5 * df['atr_20']
+        df['stop_loss_short'] = df['spy_high'].rolling(window=5).max() + 1.5 * df['atr_20']
+        df['take_profit_long'] = df['spy_close'] + 2.5 * df['atr_20']
+        df['take_profit_short'] = df['spy_close'] - 2.5 * df['atr_20']
+        
         # Clean up intermediate columns
         columns_to_drop = ['hl2', 'ad_ratio']
         df = df.drop(columns_to_drop, axis=1, errors='ignore')

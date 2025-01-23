@@ -18,6 +18,10 @@ class MLStrategy:
         self.model = model
         self.scaler = scaler
         self.feature_columns = feature_columns
+        self.current_position = None
+        self.entry_price = None
+        self.stop_loss = None
+        self.take_profit = None
         
     def calculate_confidence_score(self, X_scaled: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
         """
@@ -73,30 +77,50 @@ class MLStrategy:
         try:
             X = df[self.feature_columns]
             X_scaled = self.scaler.transform(X)
-            confidence_scores, predictions = self.calculate_confidence_score(X_scaled)
+            
+            # Get predictions (returns, exit_long, exit_short)
+            predictions = self.model.predict(X_scaled)
+            returns, exit_long, exit_short = predictions[:,0], predictions[:,1], predictions[:,2]
+            confidence_scores, _ = self.calculate_confidence_score(X_scaled)
             
             signals = pd.Series(index=df.index, data=0.0)
             recent_trade_count = 0  # Track recent trading activity
             
-            for i in range(len(predictions)):
-                # Calculate position size reduction based on recent trades
-                position_reduction = 1 / (1 + 0.2 * recent_trade_count)
+            for i in range(len(returns)):
+                # Check for exit conditions
+                if self.current_position == 1 and (exit_long[i] > 0.5 or df['spy_low'].iloc[i] <= self.stop_loss):
+                    signals.iloc[i] = 0  # Close long position
+                    self.current_position = None
+                elif self.current_position == -1 and (exit_short[i] > 0.5 or df['spy_high'].iloc[i] >= self.stop_loss):
+                    signals.iloc[i] = 0  # Close short position
+                    self.current_position = None
                 
-                # Generate signals with adjusted position sizing
-                if predictions[i] > 0.001:  # Long signal
-                    if confidence_scores[i] > min_confidence:
-                        signals.iloc[i] = max_position * confidence_scores[i] * position_reduction
-                        recent_trade_count += 1
-                elif predictions[i] < -0.001:  # Short signal
-                    if confidence_scores[i] > min_confidence:
-                        signals.iloc[i] = -max_position * confidence_scores[i] * position_reduction
-                        recent_trade_count += 1
+                # Generate new signals if no position
+                if self.current_position is None:
+                    position_reduction = 1 / (1 + 0.2 * recent_trade_count)
+                    
+                    if returns[i] > 0.001:  # Long signal
+                        if confidence_scores[i] > min_confidence:
+                            signals.iloc[i] = max_position * confidence_scores[i] * position_reduction
+                            self.current_position = 1
+                            self.entry_price = df['spy_close'].iloc[i]
+                            self.stop_loss = df['stop_loss_long'].iloc[i]
+                            self.take_profit = df['take_profit_long'].iloc[i]
+                            recent_trade_count += 1
+                    elif returns[i] < -0.001:  # Short signal
+                        if confidence_scores[i] > min_confidence:
+                            signals.iloc[i] = -max_position * confidence_scores[i] * position_reduction
+                            self.current_position = -1
+                            self.entry_price = df['spy_close'].iloc[i]
+                            self.stop_loss = df['stop_loss_short'].iloc[i]
+                            self.take_profit = df['take_profit_short'].iloc[i]
+                            recent_trade_count += 1
                 
                 # Decay recent trade count over time
                 recent_trade_count *= trade_decay
                 recent_trade_count = max(0, recent_trade_count)  # Ensure non-negative
                 
-            return signals, predictions, confidence_scores
+            return signals, returns, confidence_scores
             
         except Exception as e:
             logger.error(f"Error generating signals: {str(e)}")
