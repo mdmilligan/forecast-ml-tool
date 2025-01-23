@@ -16,17 +16,17 @@ def load_market_data(start_date='2013-01-01', end_date='2025-12-31'):
         # Read data from database in ascending date order and ensure proper datetime index
         spy = pd.read_sql("SELECT * FROM stock_data_spy WHERE date >= ? AND date <= ? ORDER BY date ASC", 
                          conn, params=(start_date, end_date))
-        spy['date'] = pd.to_datetime(spy['date'])
+        spy['date'] = pd.to_datetime(spy['date'], utc=True)
         spy = spy.set_index('date')
         
         vix = pd.read_sql("SELECT * FROM stock_data_vix WHERE date >= ? AND date <= ? ORDER BY date ASC", 
                          conn, params=(start_date, end_date))
-        vix['date'] = pd.to_datetime(vix['date'])
+        vix['date'] = pd.to_datetime(vix['date'], utc=True)
         vix = vix.set_index('date')
         
         uup = pd.read_sql("SELECT * FROM stock_data_uup WHERE date >= ? AND date <= ? ORDER BY date ASC", 
                          conn, params=(start_date, end_date))
-        uup['date'] = pd.to_datetime(uup['date'])
+        uup['date'] = pd.to_datetime(uup['date'], utc=True)
         uup = uup.set_index('date')
         
         # Create main dataframe with SPY data
@@ -75,7 +75,7 @@ def calculate_ultimate_rsi(df: pd.DataFrame, length: int = 14, smooth: int = 5) 
             elif lower.iloc[i] < lower.iloc[i-1]:
                 diff.iloc[i] = -price_range.iloc[i]
             else:
-                diff.iloc[i] = price_diff.iloc[i]
+                diff.iloc[i] = float(price_diff.iloc[i])
                 
         num = diff.ewm(alpha=1/length, adjust=False).mean()
         den = diff.abs().ewm(alpha=1/length, adjust=False).mean()
@@ -91,7 +91,7 @@ def calculate_ultimate_rsi(df: pd.DataFrame, length: int = 14, smooth: int = 5) 
         signal = ultimate_rsi_series.ewm(span=smooth, adjust=False).mean()
         
         # Fill initial NaN values with the first valid value
-        signal.fillna(method='bfill', inplace=True)
+        signal.bfill(inplace=True)
         
         return ultimate_rsi_series, signal.rename('ultimate_rsi_signal')
         

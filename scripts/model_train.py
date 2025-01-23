@@ -233,14 +233,14 @@ def train_model(X_train, y_train):
     base_model = RandomForestRegressor(random_state=42, n_jobs=-1, verbose=0)
     model = MultiOutputRegressor(base_model)
     
-    # Hyperparameter grid
+    # Hyperparameter grid - nested under estimator__ for MultiOutputRegressor
     param_dist = {
-        'n_estimators': [100, 200],
-        'max_depth': [10, 20],
-        'min_samples_split': [2, 5],
-        'min_samples_leaf': [1, 2],
-        'max_features': ['sqrt', 0.5],
-        'max_samples': [0.8]
+        'estimator__n_estimators': [100, 200],
+        'estimator__max_depth': [10, 20],
+        'estimator__min_samples_split': [2, 5],
+        'estimator__min_samples_leaf': [1, 2],
+        'estimator__max_features': ['sqrt', 0.5],
+        'estimator__max_samples': [0.8]
     }
     
     # Randomized search with custom scoring
