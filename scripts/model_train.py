@@ -90,28 +90,29 @@ def train_model(X_train, y_train):
     """Train and save the model with improved parameters"""
     from sklearn.model_selection import RandomizedSearchCV
     
-    # Base model
-    model = RandomForestRegressor(random_state=42, n_jobs=-1, verbose=1)
+    # Base model with verbose disabled
+    model = RandomForestRegressor(random_state=42, n_jobs=-1, verbose=0)
     
-    # Hyperparameter grid
+    # Reduced hyperparameter grid
     param_dist = {
-        'n_estimators': [100, 200, 300],
-        'max_depth': [10, 20, 30, None],
-        'min_samples_split': [2, 5, 10],
-        'min_samples_leaf': [1, 2, 4],
-        'max_features': ['sqrt', 0.5, 0.8],
-        'max_samples': [0.6, 0.8, 1.0]
+        'n_estimators': [100, 200],
+        'max_depth': [10, 20],
+        'min_samples_split': [2, 5],
+        'min_samples_leaf': [1, 2],
+        'max_features': ['sqrt', 0.5],
+        'max_samples': [0.8]
     }
     
-    # Randomized search with 3-fold CV
+    # Randomized search with fewer iterations
     search = RandomizedSearchCV(
         model,
         param_distributions=param_dist,
-        n_iter=20,
+        n_iter=10,  # Reduced from 20
         cv=3,
         scoring='neg_mean_squared_error',
         random_state=42,
-        n_jobs=-1
+        n_jobs=-1,
+        verbose=0  # Disable verbose output
     )
     
     search.fit(X_train, y_train)
@@ -222,7 +223,8 @@ if __name__ == "__main__":
     test_results = pd.DataFrame({
         'Actual': y_test,
         'Predicted': y_pred,
-        'Signal': signals
+        'Signal': signals,
+        'Confidence': confidence_scores  # Add confidence scores
     }, index=test_indices)
     
     try:
@@ -235,13 +237,19 @@ if __name__ == "__main__":
         
         # Save with explicit path and error handling
         file_path = data_dir / 'test_predictions.csv'
-        test_results.to_csv(file_path)
+        # Force overwrite and ensure proper datetime formatting
+        test_results.to_csv(file_path, index=True, date_format='%Y-%m-%d %H:%M:%S%z')
         print(f"\nSuccessfully saved test predictions to {file_path.absolute()}")
         
+        # Verify file was written
+        if not file_path.exists():
+            raise FileNotFoundError(f"Failed to create {file_path}")
+            
     except Exception as e:
         print(f"\nError saving predictions: {str(e)}")
         import traceback
         traceback.print_exc()
+        raise  # Re-raise exception to fail visibly
     
     print(f"\nModel training complete! Time taken: {datetime.now() - start_time}")
     print("\nRun backtest.py separately to evaluate model performance")
