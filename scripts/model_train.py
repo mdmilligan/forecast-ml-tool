@@ -143,15 +143,17 @@ def export_predictions(df, model_path='data/model.pkl', scaler_path='data/scaler
         y_pred = model.predict(X_test)
         confidence_scores = MLStrategy(model, scaler, feature_columns).calculate_confidence_score(X_test)
         
-        # Generate signals
+        # Generate signals using only the return predictions (first column)
         min_confidence = 0.5
-        return_threshold = np.percentile(y_pred, 75)
+        return_predictions = y_pred[:, 0]  # Use only the return predictions
+        return_threshold = np.percentile(return_predictions, 75)
+        
         signals = pd.Series(
             np.where(
-                (y_pred > return_threshold) & (confidence_scores > min_confidence), 
+                (return_predictions > return_threshold) & (confidence_scores > min_confidence), 
                 1, 
                 np.where(
-                    (y_pred < -return_threshold) & (confidence_scores > min_confidence), 
+                    (return_predictions < -return_threshold) & (confidence_scores > min_confidence), 
                     -1, 
                     0
                 )
@@ -161,8 +163,12 @@ def export_predictions(df, model_path='data/model.pkl', scaler_path='data/scaler
         
         # Save predictions
         test_results = pd.DataFrame({
-            'Actual': y_test,
-            'Predicted': y_pred,
+            'Actual_Return': y_test.iloc[:, 0],
+            'Actual_Exit_Long': y_test.iloc[:, 1],
+            'Actual_Exit_Short': y_test.iloc[:, 2],
+            'Predicted_Return': y_pred[:, 0],
+            'Predicted_Exit_Long': y_pred[:, 1],
+            'Predicted_Exit_Short': y_pred[:, 2],
             'Signal': signals,
             'Confidence': confidence_scores
         }, index=test_indices)
