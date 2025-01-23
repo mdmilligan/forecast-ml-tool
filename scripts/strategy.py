@@ -57,14 +57,15 @@ class MLStrategy:
             raise
             
     def generate_signals(self, df: pd.DataFrame, max_position: float = 1.0, 
-                        min_confidence: float = 0.2) -> Tuple[pd.Series, np.ndarray, np.ndarray]:
+                        min_confidence: float = 0.2, trade_decay: float = 0.9) -> Tuple[pd.Series, np.ndarray, np.ndarray]:
         """
-        Generate trading signals with position sizing based on confidence
+        Generate trading signals with dynamic position sizing based on recent trading activity
         
         Args:
             df: DataFrame containing features
             max_position: Maximum position size (0-1)
             min_confidence: Minimum confidence threshold
+            trade_decay: Decay rate for recent trade count (0-1)
             
         Returns:
             Tuple of (signals, predictions, confidence_scores)
@@ -75,16 +76,26 @@ class MLStrategy:
             confidence_scores, predictions = self.calculate_confidence_score(X_scaled)
             
             signals = pd.Series(index=df.index, data=0.0)
+            recent_trade_count = 0  # Track recent trading activity
             
-            # Apply position sizing based on confidence
             for i in range(len(predictions)):
+                # Calculate position size reduction based on recent trades
+                position_reduction = 1 / (1 + 0.2 * recent_trade_count)
+                
+                # Generate signals with adjusted position sizing
                 if predictions[i] > 0.001:  # Long signal
                     if confidence_scores[i] > min_confidence:
-                        signals.iloc[i] = max_position * confidence_scores[i]
+                        signals.iloc[i] = max_position * confidence_scores[i] * position_reduction
+                        recent_trade_count += 1
                 elif predictions[i] < -0.001:  # Short signal
                     if confidence_scores[i] > min_confidence:
-                        signals.iloc[i] = -max_position * confidence_scores[i]
-            
+                        signals.iloc[i] = -max_position * confidence_scores[i] * position_reduction
+                        recent_trade_count += 1
+                
+                # Decay recent trade count over time
+                recent_trade_count *= trade_decay
+                recent_trade_count = max(0, recent_trade_count)  # Ensure non-negative
+                
             return signals, predictions, confidence_scores
             
         except Exception as e:

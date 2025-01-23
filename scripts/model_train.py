@@ -148,20 +148,37 @@ def train_model(X_train, y_train):
     from sklearn.model_selection import RandomizedSearchCV
     
     # Custom scoring function to penalize frequent trading
-    def turnover_penalized_score(estimator, X, y):
+    def position_aware_score(estimator, X, y):
         # Get predictions
         y_pred = estimator.predict(X)
         
         # Calculate base MSE
         mse = mean_squared_error(y, y_pred)
         
-        # Calculate trading frequency
-        signals = np.where(y_pred > 0.001, 1, np.where(y_pred < -0.001, -1, 0))
-        trades = np.abs(np.diff(signals)).sum()
+        # Simulate position sizing based on trading frequency
+        recent_trade_count = 0
+        trade_decay = 0.9
+        position_sizes = []
         
-        # Add penalty for frequent trading
-        turnover_penalty = trades / len(signals)  # Normalized by number of periods
-        return -(mse + 0.1 * turnover_penalty)  # Negative since we want to maximize
+        for pred in y_pred:
+            position_reduction = 1 / (1 + 0.2 * recent_trade_count)
+            if abs(pred) > 0.001:
+                position_sizes.append(position_reduction)
+                recent_trade_count += 1
+            else:
+                position_sizes.append(0)
+            
+            # Decay recent trade count
+            recent_trade_count *= trade_decay
+        
+        # Calculate average position size
+        avg_position_size = np.mean(position_sizes) if position_sizes else 0
+        
+        # Reward larger average position sizes (less frequent trading)
+        position_reward = avg_position_size
+        
+        # Combine metrics
+        return -(mse - 0.2 * position_reward)  # Negative since we want to maximize
     
     # Base model with verbose disabled
     model = RandomForestRegressor(random_state=42, n_jobs=-1, verbose=0)
@@ -182,7 +199,7 @@ def train_model(X_train, y_train):
         param_distributions=param_dist,
         n_iter=10,
         cv=3,
-        scoring=turnover_penalized_score,
+        scoring=position_aware_score,
         random_state=42,
         n_jobs=-1,
         verbose=0
