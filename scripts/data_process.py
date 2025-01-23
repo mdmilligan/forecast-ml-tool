@@ -8,18 +8,26 @@ import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-def load_market_data(start_date='2013-01-01', end_date='2024-12-31'):
+def load_market_data(start_date='2013-01-01', end_date='2025-12-31'):
     """Load and preprocess historical market data from database"""
     try:
         conn = sqlite3.connect('data/marketdata.db')
         
-        # Read data from database
-        spy = pd.read_sql("SELECT * FROM stock_data_spy WHERE date >= ? AND date <= ?", 
-                         conn, params=(start_date, end_date), parse_dates=['date'], index_col='date')
-        vix = pd.read_sql("SELECT * FROM stock_data_vix WHERE date >= ? AND date <= ?", 
-                         conn, params=(start_date, end_date), parse_dates=['date'], index_col='date')
-        uup = pd.read_sql("SELECT * FROM stock_data_uup WHERE date >= ? AND date <= ?", 
-                         conn, params=(start_date, end_date), parse_dates=['date'], index_col='date')
+        # Read data from database in ascending date order and ensure proper datetime index
+        spy = pd.read_sql("SELECT * FROM stock_data_spy WHERE date >= ? AND date <= ? ORDER BY date ASC", 
+                         conn, params=(start_date, end_date))
+        spy['date'] = pd.to_datetime(spy['date'])
+        spy = spy.set_index('date')
+        
+        vix = pd.read_sql("SELECT * FROM stock_data_vix WHERE date >= ? AND date <= ? ORDER BY date ASC", 
+                         conn, params=(start_date, end_date))
+        vix['date'] = pd.to_datetime(vix['date'])
+        vix = vix.set_index('date')
+        
+        uup = pd.read_sql("SELECT * FROM stock_data_uup WHERE date >= ? AND date <= ? ORDER BY date ASC", 
+                         conn, params=(start_date, end_date))
+        uup['date'] = pd.to_datetime(uup['date'])
+        uup = uup.set_index('date')
         
         # Create main dataframe with SPY data
         df = pd.DataFrame(index=spy.index)

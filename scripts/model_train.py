@@ -7,7 +7,7 @@ import joblib
 import pandas as pd
 from datetime import datetime
 import matplotlib.pyplot as plt
-from data_processing import load_market_data, calculate_technical_indicators
+from data_process import load_market_data, calculate_technical_indicators
 
 def prepare_features(df):
     """Prepare features for model training using all technical indicators"""
@@ -16,7 +16,7 @@ def prepare_features(df):
         'spy_close', 'spy_volume', 'vix_close', 'uup_close',
         
         # Moving Averages
-        'EMA21', 'EMA50', 'SMA20', 'SMA50_daily',
+        'EMA21', 'EMA50', 'SMA20', 'SMA50',
         
         # Bollinger Bands
         'bb_percent_b', 'bb_bandwidth',
@@ -29,9 +29,10 @@ def prepare_features(df):
         
         # Fisher Transform
         'fisher', 'fisher_trigger',
+        'fisher_cross_above', 'fisher_cross_below',
         
         # Distance to MAs
-        'dist_to_EMA21', 'dist_to_EMA50', 'dist_to_50day_SMA',
+        'dist_to_EMA21', 'dist_to_EMA50', 'dist_to_5day_SMA',
         
         # Slope
         'slope',
@@ -40,6 +41,20 @@ def prepare_features(df):
         'ultimate_rsi', 'ultimate_rsi_signal'
     ]
     
+    # Add crossover features
+    df['fisher_cross_above'] = ((df['fisher'] > df['fisher_trigger']) & 
+                               (df['fisher'].shift() <= df['fisher_trigger'].shift())).astype(int)
+    df['fisher_cross_below'] = ((df['fisher'] < df['fisher_trigger']) & 
+                               (df['fisher'].shift() >= df['fisher_trigger'].shift())).astype(int)
+    df['ursi_cross_above'] = ((df['ultimate_rsi'] > df['ultimate_rsi_signal']) & 
+                             (df['ultimate_rsi'].shift() <= df['ultimate_rsi_signal'].shift())).astype(int)
+    df['ursi_cross_below'] = ((df['ultimate_rsi'] < df['ultimate_rsi_signal']) & 
+                             (df['ultimate_rsi'].shift() >= df['ultimate_rsi_signal'].shift())).astype(int)
+
+    # Add crossover features to feature columns
+    feature_columns.extend(['fisher_cross_above', 'fisher_cross_below', 
+                          'ursi_cross_above', 'ursi_cross_below'])
+
     # Create feature matrix and target
     X = df[feature_columns]
     # Use log returns as target for better numerical stability
@@ -73,17 +88,37 @@ class MLStrategy:
 
 def train_model(X_train, y_train):
     """Train and save the model with improved parameters"""
-    model = RandomForestRegressor(
-        n_estimators=300,
-        max_depth=20,
-        min_samples_split=3,
-        min_samples_leaf=1,
-        max_features=0.5,  # Use half of features for each split
+    from sklearn.model_selection import RandomizedSearchCV
+    
+    # Base model
+    model = RandomForestRegressor(random_state=42, n_jobs=-1, verbose=1)
+    
+    # Hyperparameter grid
+    param_dist = {
+        'n_estimators': [100, 200, 300],
+        'max_depth': [10, 20, 30, None],
+        'min_samples_split': [2, 5, 10],
+        'min_samples_leaf': [1, 2, 4],
+        'max_features': ['sqrt', 0.5, 0.8],
+        'max_samples': [0.6, 0.8, 1.0]
+    }
+    
+    # Randomized search with 3-fold CV
+    search = RandomizedSearchCV(
+        model,
+        param_distributions=param_dist,
+        n_iter=20,
+        cv=3,
+        scoring='neg_mean_squared_error',
         random_state=42,
-        n_jobs=-1,
-        verbose=1,
-        max_samples=0.8  # Use bootstrap sampling
+        n_jobs=-1
     )
+    
+    search.fit(X_train, y_train)
+    print(f"Best parameters: {search.best_params_}")
+    print(f"Best CV score: {-search.best_score_:.4f}")
+    
+    return search.best_estimator_
     
     # Fit model with early stopping if possible
     try:
@@ -108,12 +143,17 @@ if __name__ == "__main__":
     df = calculate_technical_indicators(df)
     X, y, scaler, feature_columns, valid_idx = prepare_features(df)
     
-    # Split data - train on 2013-2023, test on 2024
-    train_mask = df.index < '2024-01-01'
-    test_mask = df.index >= '2024-01-01'
+    # Split data by position - train on first 90%, test on last 10%
+    split_idx = int(len(X) * 0.9)
+    X_train, X_test = X[:split_idx], X[split_idx:]
+    y_train, y_test = y[:split_idx], y[split_idx:]
     
-    X_train, X_test = X[train_mask], X[test_mask]
-    y_train, y_test = y[train_mask], y[test_mask]
+    # Get test set date range and info
+    test_dates = df.index[valid_idx][split_idx:]
+    print(f"\nUsing 90/10 split")
+    print(f"Test set date range: {test_dates[-1]} to {test_dates[0]}")  # Oldest to newest
+    print(f"Test set size: {len(X_test)} samples (10% of total data)")
+    print(f"Training set size: {len(X_train)} samples (90% of total data)")
     
     # Train and save model
     model = train_model(X_train, y_train)
@@ -130,7 +170,7 @@ if __name__ == "__main__":
     print(f"Mean Squared Error: {mse:.4f}")
     print(f"R-squared: {r2:.4f}")
     
-    # Enhanced feature importance analysis
+    # Feature selection based on importance
     importances = model.feature_importances_
     std = np.std([tree.feature_importances_ for tree in model.estimators_], axis=0)
     feature_importance_df = pd.DataFrame({
@@ -138,6 +178,15 @@ if __name__ == "__main__":
         'Importance': importances,
         'Std': std
     }).sort_values('Importance', ascending=False)
+    
+    # Select top 50% of features
+    threshold = np.median(feature_importance_df['Importance'])
+    selected_features = feature_importance_df[feature_importance_df['Importance'] > threshold]['Feature'].tolist()
+    print(f"\nSelected {len(selected_features)} features out of {len(feature_columns)}")
+    print(f"Selected features: {selected_features}")
+    
+    # Update feature columns
+    feature_columns = selected_features
     
     # Print all feature importances with formatting
     print("\nAll Feature Importances:")
@@ -149,19 +198,24 @@ if __name__ == "__main__":
     # Calculate confidence scores
     confidence_scores = strategy.calculate_confidence_score(X_test)
     
-    # Generate signals with confidence threshold
-    min_confidence = 0.7  # Minimum confidence threshold
+    # Generate signals with dynamic thresholds
+    min_confidence = 0.5  # Lower confidence threshold
+    return_threshold = np.percentile(y_pred, 75)  # Use 75th percentile as threshold
+    
+    # Get test set indices from the position-based split
+    test_indices = df.index[valid_idx][split_idx:]
+    
     signals = pd.Series(
         np.where(
-            (y_pred > 0.0025) & (confidence_scores > min_confidence), 
+            (y_pred > return_threshold) & (confidence_scores > min_confidence), 
             1, 
             np.where(
-                (y_pred < -0.0025) & (confidence_scores > min_confidence), 
+                (y_pred < -return_threshold) & (confidence_scores > min_confidence), 
                 -1, 
                 0
             )
         ),
-        index=df.index[test_mask]
+        index=test_indices
     )
     
     # Initialize backtest metrics
@@ -172,8 +226,8 @@ if __name__ == "__main__":
     
     # Run backtest only if we have valid signals
     if signals.abs().sum() > 0:
-        from scripts.backtest import run_backtest
-        test_df = df[test_mask]
+        from .backtest import run_backtest
+        test_df = df.loc[test_indices]
         backtest_metrics = run_backtest(test_df, signals, confidence_scores)
         
         # Save test predictions
@@ -181,14 +235,27 @@ if __name__ == "__main__":
             'Actual': y_test,
             'Predicted': y_pred,
             'Signal': signals
-        }, index=df.index[test_mask])
+        }, index=test_indices)
         
         try:
-            test_results.to_csv('data/test_predictions.csv')
-        except PermissionError:
-            print("Warning: Could not save predictions due to permission error")
+            import os
+            from pathlib import Path
+            
+            # Create data directory if it doesn't exist
+            data_dir = Path('data')
+            data_dir.mkdir(exist_ok=True)
+            
+            # Save with explicit path and error handling
+            file_path = data_dir / 'test_predictions.csv'
+            test_results.to_csv(file_path)
+            print(f"\nSuccessfully saved test predictions to {file_path.absolute()}")
+            
+        except Exception as e:
+            print(f"\nError saving predictions: {str(e)}")
+            import traceback
+            traceback.print_exc()
             backtest_metrics['status'] = 'error'
-            backtest_metrics['message'] = 'Could not save predictions'
+            backtest_metrics['message'] = f'Could not save predictions: {str(e)}'
     else:
         print("Warning: No valid signals generated for backtesting")
     

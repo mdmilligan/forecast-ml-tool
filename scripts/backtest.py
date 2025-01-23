@@ -3,6 +3,7 @@ import numpy as np
 from datetime import timedelta
 from sklearn.metrics import accuracy_score
 import matplotlib.pyplot as plt
+from data_process import load_market_data
 
 class Backtester:
     def __init__(self, initial_capital=100000, commission=0.0005):
@@ -24,13 +25,16 @@ class Backtester:
         if confidence_scores is None:
             confidence_scores = np.ones(len(signals))
             
-        # Track trade statistics
+        # Track trade statistics with dates
         trade_stats = {
             'entry_dates': [],
             'exit_dates': [],
+            'entry_prices': [],
+            'exit_prices': [],
             'returns': [],
             'durations': [],
-            'position_sizes': []
+            'position_sizes': [],
+            'trade_dates': []  # Track dates for each trade
         }
         
         # Initialize previous price
@@ -56,9 +60,14 @@ class Backtester:
             if position_change != 0:
                 if position != 0:  # Exiting a position
                     trade_stats['exit_dates'].append(df.index[i])
+                    trade_stats['exit_prices'].append(current_price)
                     trade_stats['returns'].append(daily_return)
                     trade_stats['durations'].append(len(trade_stats['entry_dates']) - len(trade_stats['exit_dates']))
                     trade_stats['position_sizes'].append(abs(position))
+                    trade_stats['trade_dates'].append({
+                        'entry': trade_stats['entry_dates'][-1],
+                        'exit': df.index[i]
+                    })
                     
                     if daily_return > 0:
                         winning_trades += 1
@@ -67,6 +76,7 @@ class Backtester:
                 
                 if target_position != 0:  # Entering a position
                     trade_stats['entry_dates'].append(df.index[i])
+                    trade_stats['entry_prices'].append(current_price)
                 
                 total_position_size += abs(position_change)
             
@@ -94,6 +104,14 @@ class Backtester:
         total_return = returns[-1] / self.initial_capital - 1
         annualized_return = (1 + total_return) ** (252/len(returns)) - 1
         
+        # Add date-based metrics
+        if trade_stats['trade_dates']:
+            first_trade_date = trade_stats['trade_dates'][0]['entry']
+            last_trade_date = trade_stats['trade_dates'][-1]['exit']
+            trade_duration = (last_trade_date - first_trade_date).days
+        else:
+            first_trade_date = last_trade_date = trade_duration = None
+        
         # Calculate trade statistics
         win_rate = winning_trades / trade_count if trade_count > 0 else 0
         avg_trade_duration = np.mean(trade_stats['durations']) if trade_stats['durations'] else 0
@@ -120,7 +138,7 @@ class Backtester:
         # Calculate benchmark metrics
         benchmark_total_return = benchmark_returns[-1] / benchmark_returns[0] - 1
         
-        return {
+        metrics = {
             'total_return': total_return,
             'annualized_return': annualized_return,
             'annualized_volatility': annualized_vol,
@@ -133,8 +151,14 @@ class Backtester:
             'avg_position_size': avg_position_size,
             'avg_winning_return': avg_winning_return,
             'avg_losing_return': avg_losing_return,
-            'profit_factor': abs(avg_winning_return / avg_losing_return) if avg_losing_return != 0 else 0
+            'profit_factor': abs(avg_winning_return / avg_losing_return) if avg_losing_return != 0 else 0,
+            'first_trade_date': first_trade_date,
+            'last_trade_date': last_trade_date,
+            'trade_duration_days': trade_duration,
+            'trade_dates': trade_stats['trade_dates']
         }
+        
+        return metrics
     
     def plot_results(self, strategy_returns, benchmark_returns, metrics, confidence_scores=None):
         """Plot backtest results with confidence visualization"""
@@ -157,7 +181,7 @@ class Backtester:
             ax2.legend()
             ax2.grid(True)
         
-        # Add metrics text box
+        # Add metrics text box with dates
         metrics_text = "\n".join([
             f"Total Return: {metrics['total_return']:.2%}",
             f"Annualized Vol: {metrics['annualized_volatility']:.2%}",
@@ -167,7 +191,10 @@ class Backtester:
             f"Win Rate: {metrics['win_rate']:.1%}",
             f"Avg Trade Duration: {metrics['avg_trade_duration']:.1f} days",
             f"Avg Position Size: {metrics['avg_position_size']:.1%}",
-            f"Profit Factor: {metrics['profit_factor']:.2f}"
+            f"Profit Factor: {metrics['profit_factor']:.2f}",
+            f"First Trade: {metrics['first_trade_date']}",
+            f"Last Trade: {metrics['last_trade_date']}",
+            f"Trade Period: {metrics['trade_duration_days']} days"
         ])
         ax1.text(0.02, 0.98, metrics_text, 
                 transform=ax1.transAxes,
@@ -205,3 +232,23 @@ def run_backtest(df, signals, confidence_scores=None):
     backtester.plot_results(strategy_returns, benchmark_returns, metrics, confidence_scores)
     
     return metrics
+
+if __name__ == "__main__":
+    # Load test predictions if running directly
+    try:
+        test_results = pd.read_csv('data/test_predictions.csv', index_col=0, parse_dates=True)
+        df = load_market_data()
+        
+        # Run backtest with saved predictions
+        metrics = run_backtest(
+            df.loc[test_results.index],
+            test_results['Signal'],
+            test_results.get('Confidence', None)
+        )
+        
+        print("\nBacktest Metrics:")
+        print(metrics)
+        
+    except Exception as e:
+        print(f"Error running backtest: {str(e)}")
+        print("Make sure to run model_train.py first to generate predictions")
