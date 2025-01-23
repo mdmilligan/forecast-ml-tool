@@ -86,6 +86,63 @@ class MLStrategy:
         confidence = 1 / (1 + std_dev)
         return confidence
 
+def export_predictions(df, model_path='data/model.pkl', scaler_path='data/scaler.pkl', 
+                      feature_columns_path='data/feature_columns.pkl'):
+    """Export predictions using existing trained model"""
+    try:
+        # Load trained model and artifacts
+        model = joblib.load(model_path)
+        scaler = joblib.load(scaler_path)
+        feature_columns = joblib.load(feature_columns_path)
+        
+        # Prepare features
+        X, y, _, _, valid_idx = prepare_features(df)
+        
+        # Get test set (last 10%)
+        split_idx = int(len(X) * 0.9)
+        X_test = X[split_idx:]
+        y_test = y[split_idx:]
+        test_indices = df.index[valid_idx][split_idx:]
+        
+        # Generate predictions
+        y_pred = model.predict(X_test)
+        confidence_scores = MLStrategy(model, scaler, feature_columns).calculate_confidence_score(X_test)
+        
+        # Generate signals
+        min_confidence = 0.5
+        return_threshold = np.percentile(y_pred, 75)
+        signals = pd.Series(
+            np.where(
+                (y_pred > return_threshold) & (confidence_scores > min_confidence), 
+                1, 
+                np.where(
+                    (y_pred < -return_threshold) & (confidence_scores > min_confidence), 
+                    -1, 
+                    0
+                )
+            ),
+            index=test_indices
+        )
+        
+        # Save predictions
+        test_results = pd.DataFrame({
+            'Actual': y_test,
+            'Predicted': y_pred,
+            'Signal': signals,
+            'Confidence': confidence_scores
+        }, index=test_indices)
+        
+        # Save to file
+        file_path = Path('data/test_predictions.csv')
+        test_results.to_csv(file_path, index=True, date_format='%Y-%m-%d %H:%M:%S%z')
+        print(f"\nSuccessfully exported predictions to {file_path.absolute()}")
+        
+        return test_results
+        
+    except Exception as e:
+        print(f"\nError exporting predictions: {str(e)}")
+        raise
+
 def train_model(X_train, y_train):
     """Train and save the model with improved parameters"""
     from sklearn.model_selection import RandomizedSearchCV
@@ -136,12 +193,26 @@ def train_model(X_train, y_train):
     return model
 
 if __name__ == "__main__":
-    print("Training model...")
-    start_time = datetime.now()
+    import argparse
+    import sys
+    from pathlib import Path
+    
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--export-only', action='store_true',
+                       help='Export predictions without retraining')
+    args = parser.parse_args()
     
     # Fetch and prepare data
     df = load_market_data()
     df = calculate_technical_indicators(df)
+    
+    if args.export_only:
+        print("Exporting predictions from existing model...")
+        export_predictions(df)
+        sys.exit(0)
+        
+    print("Training model...")
+    start_time = datetime.now()
     X, y, scaler, feature_columns, valid_idx = prepare_features(df)
     
     # Split data by position - train on first 90%, test on last 10%
