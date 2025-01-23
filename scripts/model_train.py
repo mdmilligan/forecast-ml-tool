@@ -144,13 +144,29 @@ def export_predictions(df, model_path='data/model.pkl', scaler_path='data/scaler
         raise
 
 def train_model(X_train, y_train):
-    """Train and save the model with improved parameters"""
+    """Train and save the model with turnover penalty"""
     from sklearn.model_selection import RandomizedSearchCV
+    
+    # Custom scoring function to penalize frequent trading
+    def turnover_penalized_score(estimator, X, y):
+        # Get predictions
+        y_pred = estimator.predict(X)
+        
+        # Calculate base MSE
+        mse = mean_squared_error(y, y_pred)
+        
+        # Calculate trading frequency
+        signals = np.where(y_pred > 0.001, 1, np.where(y_pred < -0.001, -1, 0))
+        trades = np.abs(np.diff(signals)).sum()
+        
+        # Add penalty for frequent trading
+        turnover_penalty = trades / len(signals)  # Normalized by number of periods
+        return -(mse + 0.1 * turnover_penalty)  # Negative since we want to maximize
     
     # Base model with verbose disabled
     model = RandomForestRegressor(random_state=42, n_jobs=-1, verbose=0)
     
-    # Reduced hyperparameter grid
+    # Hyperparameter grid
     param_dist = {
         'n_estimators': [100, 200],
         'max_depth': [10, 20],
@@ -160,16 +176,16 @@ def train_model(X_train, y_train):
         'max_samples': [0.8]
     }
     
-    # Randomized search with fewer iterations
+    # Randomized search with custom scoring
     search = RandomizedSearchCV(
         model,
         param_distributions=param_dist,
-        n_iter=10,  # Reduced from 20
+        n_iter=10,
         cv=3,
-        scoring='neg_mean_squared_error',
+        scoring=turnover_penalized_score,
         random_state=42,
         n_jobs=-1,
-        verbose=0  # Disable verbose output
+        verbose=0
     )
     
     search.fit(X_train, y_train)

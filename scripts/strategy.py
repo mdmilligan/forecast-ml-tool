@@ -57,37 +57,46 @@ class MLStrategy:
             raise
             
     def generate_signals(self, df: pd.DataFrame, max_position: float = 1.0, 
-                        min_confidence: float = 0.2) -> Tuple[pd.Series, np.ndarray, np.ndarray]:
+                        base_confidence: float = 0.2) -> Tuple[pd.Series, np.ndarray, np.ndarray]:
         """
-        Generate trading signals with position sizing based on confidence
+        Generate trading signals with dynamic confidence threshold
+        that increases with recent trading activity
         
         Args:
             df: DataFrame containing features
             max_position: Maximum position size (0-1)
-            min_confidence: Minimum confidence threshold
+            base_confidence: Base confidence threshold
             
         Returns:
             Tuple of (signals, predictions, confidence_scores)
         """
         try:
-            # Prepare features
             X = df[self.feature_columns]
             X_scaled = self.scaler.transform(X)
-            
-            # Get confidence scores and predictions
             confidence_scores, predictions = self.calculate_confidence_score(X_scaled)
             
-            # Generate base signals
             signals = pd.Series(index=df.index, data=0.0)
+            trade_count = 0  # Track recent trades
             
-            # Apply position sizing based on confidence
             for i in range(len(predictions)):
+                # Calculate dynamic confidence threshold
+                dynamic_threshold = base_confidence * (1 + 0.1 * trade_count)
+                
                 if predictions[i] > 0.001:  # Long signal
-                    if confidence_scores[i] > min_confidence:
-                        signals.iloc[i] = max_position * confidence_scores[i]
+                    if confidence_scores[i] > dynamic_threshold:
+                        # Calculate position size reduction
+                        position_reduction = 1 / (1 + 0.2 * trade_count)
+                        signals.iloc[i] = max_position * confidence_scores[i] * position_reduction
+                        trade_count += 1
                 elif predictions[i] < -0.001:  # Short signal
-                    if confidence_scores[i] > min_confidence:
-                        signals.iloc[i] = -max_position * confidence_scores[i]
+                    if confidence_scores[i] > dynamic_threshold:
+                        position_reduction = 1 / (1 + 0.2 * trade_count)
+                        signals.iloc[i] = -max_position * confidence_scores[i] * position_reduction
+                        trade_count += 1
+                
+                # Decay trade count over time
+                if i % 5 == 0:  # Every 5 periods
+                    trade_count = max(0, trade_count - 1)
             
             return signals, predictions, confidence_scores
             
