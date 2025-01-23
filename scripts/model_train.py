@@ -218,49 +218,30 @@ if __name__ == "__main__":
         index=test_indices
     )
     
-    # Initialize backtest metrics
-    backtest_metrics = {
-        'status': 'no_signals',
-        'message': 'No valid signals generated for backtesting'
-    }
+    # Save test predictions for later backtesting
+    test_results = pd.DataFrame({
+        'Actual': y_test,
+        'Predicted': y_pred,
+        'Signal': signals
+    }, index=test_indices)
     
-    # Run backtest only if we have valid signals
-    if signals.abs().sum() > 0:
-        from .backtest import run_backtest
-        test_df = df.loc[test_indices]
-        backtest_metrics = run_backtest(test_df, signals, confidence_scores)
+    try:
+        import os
+        from pathlib import Path
         
-        # Save test predictions
-        test_results = pd.DataFrame({
-            'Actual': y_test,
-            'Predicted': y_pred,
-            'Signal': signals
-        }, index=test_indices)
+        # Create data directory if it doesn't exist
+        data_dir = Path('data')
+        data_dir.mkdir(exist_ok=True)
         
-        try:
-            import os
-            from pathlib import Path
-            
-            # Create data directory if it doesn't exist
-            data_dir = Path('data')
-            data_dir.mkdir(exist_ok=True)
-            
-            # Save with explicit path and error handling
-            file_path = data_dir / 'test_predictions.csv'
-            test_results.to_csv(file_path)
-            print(f"\nSuccessfully saved test predictions to {file_path.absolute()}")
-            
-        except Exception as e:
-            print(f"\nError saving predictions: {str(e)}")
-            import traceback
-            traceback.print_exc()
-            backtest_metrics['status'] = 'error'
-            backtest_metrics['message'] = f'Could not save predictions: {str(e)}'
-    else:
-        print("Warning: No valid signals generated for backtesting")
-    
-    print("\nBacktest Metrics:")
-    print(backtest_metrics)
-    print("\nSaved test predictions to data/test_predictions.csv")
+        # Save with explicit path and error handling
+        file_path = data_dir / 'test_predictions.csv'
+        test_results.to_csv(file_path)
+        print(f"\nSuccessfully saved test predictions to {file_path.absolute()}")
+        
+    except Exception as e:
+        print(f"\nError saving predictions: {str(e)}")
+        import traceback
+        traceback.print_exc()
     
     print(f"\nModel training complete! Time taken: {datetime.now() - start_time}")
+    print("\nRun backtest.py separately to evaluate model performance")

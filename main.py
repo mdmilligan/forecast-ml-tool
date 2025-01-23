@@ -47,7 +47,8 @@ def main():
         train_model(df)
         
     if args.backtest:
-        run_backtest(df)
+        from scripts.backtest import load_and_backtest
+        load_and_backtest()
         
     if args.predict:
         generate_predictions(df)

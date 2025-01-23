@@ -209,7 +209,6 @@ def run_backtest(df, signals, confidence_scores=None):
     backtester = Backtester()
     
     # Calculate strategy returns
-    # Calculate strategy returns and get trade statistics
     strategy_returns, trade_count, winning_trades, losing_trades, total_position_size, trade_stats = (
         backtester.calculate_returns(df, signals, confidence_scores)
     )
@@ -217,7 +216,7 @@ def run_backtest(df, signals, confidence_scores=None):
     # Calculate benchmark returns (buy & hold)
     benchmark_returns = df['spy_close'].values / df['spy_close'].iloc[0] * backtester.initial_capital
     
-    # Calculate performance metrics with all required parameters
+    # Calculate performance metrics
     metrics = backtester.calculate_metrics(
         strategy_returns, 
         benchmark_returns, 
@@ -233,15 +232,19 @@ def run_backtest(df, signals, confidence_scores=None):
     
     return metrics
 
-if __name__ == "__main__":
-    # Load test predictions if running directly
+def load_and_backtest():
+    """Load predictions and run backtest"""
     try:
+        # Load test predictions
         test_results = pd.read_csv('data/test_predictions.csv', index_col=0, parse_dates=True)
+        
+        # Load market data for the prediction period
         df = load_market_data()
+        test_df = df.loc[test_results.index]
         
         # Run backtest with saved predictions
         metrics = run_backtest(
-            df.loc[test_results.index],
+            test_df,
             test_results['Signal'],
             test_results.get('Confidence', None)
         )
@@ -249,6 +252,13 @@ if __name__ == "__main__":
         print("\nBacktest Metrics:")
         print(metrics)
         
+        return metrics
+        
+    except FileNotFoundError:
+        print("Error: test_predictions.csv not found. Please run model_train.py first.")
     except Exception as e:
         print(f"Error running backtest: {str(e)}")
-        print("Make sure to run model_train.py first to generate predictions")
+        raise
+
+if __name__ == "__main__":
+    load_and_backtest()

@@ -112,7 +112,6 @@ if __name__ == "__main__":
     
     # Fetch and calculate indicators for most recent data
     df = load_market_data(start_date='2024-12-01', end_date='2025-01-20')
-    df.index = df.index.tz_localize(None)
     df = calculate_technical_indicators(df)
     
     # Plot current indicators
