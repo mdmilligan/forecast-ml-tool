@@ -160,49 +160,162 @@ class Backtester:
         
         return metrics
     
-    def plot_results(self, strategy_returns, benchmark_returns, metrics, confidence_scores=None):
-        """Plot backtest results with confidence visualization"""
-        fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 8), sharex=True)
-        
-        # Plot strategy vs benchmark
-        ax1.plot(strategy_returns, label='Strategy')
-        ax1.plot(benchmark_returns, label='Benchmark (Buy & Hold)')
-        ax1.set_title(f"Backtest Results\nAnnualized Return: {metrics['annualized_return']:.2%}")
-        ax1.set_ylabel('Portfolio Value')
-        ax1.legend()
-        ax1.grid(True)
-        
-        # Add confidence visualization if available
+    def create_interactive_dashboard(self, df, strategy_returns, benchmark_returns, metrics, confidence_scores=None):
+        """Create interactive Plotly dashboard"""
+        import dash
+        from dash import dcc, html
+        import dash_bootstrap_components as dbc
+        import plotly.graph_objects as go
+        from dash.dependencies import Input, Output
+
+        # Create figures
+        equity_fig = go.Figure()
+        equity_fig.add_trace(go.Scatter(
+            x=df.index,
+            y=strategy_returns,
+            name='Strategy',
+            line=dict(color='royalblue', width=2)
+        ))
+        equity_fig.add_trace(go.Scatter(
+            x=df.index,
+            y=benchmark_returns,
+            name='Benchmark',
+            line=dict(color='gray', width=1, dash='dot')
+        ))
+        equity_fig.update_layout(
+            title='Equity Curve',
+            xaxis_title='Date',
+            yaxis_title='Portfolio Value',
+            hovermode='x unified'
+        )
+
+        # Create drawdown figure
+        cumulative_max = np.maximum.accumulate(strategy_returns)
+        drawdown = (cumulative_max - strategy_returns) / cumulative_max
+        drawdown_fig = go.Figure()
+        drawdown_fig.add_trace(go.Scatter(
+            x=df.index,
+            y=drawdown,
+            fill='tozeroy',
+            fillcolor='rgba(255,0,0,0.2)',
+            line=dict(color='red', width=1),
+            name='Drawdown'
+        ))
+        drawdown_fig.update_layout(
+            title='Drawdown',
+            xaxis_title='Date',
+            yaxis_title='Drawdown',
+            yaxis_tickformat='.1%'
+        )
+
+        # Create confidence figure if available
         if confidence_scores is not None:
-            ax2.plot(confidence_scores, color='purple', alpha=0.6, label='Confidence')
-            ax2.axhline(y=0.7, color='red', linestyle='--', label='Confidence Threshold')
-            ax2.set_ylabel('Confidence')
-            ax2.set_xlabel('Days')
-            ax2.legend()
-            ax2.grid(True)
-        
-        # Add metrics text box with dates
-        metrics_text = "\n".join([
-            f"Total Return: {metrics['total_return']:.2%}",
-            f"Annualized Vol: {metrics['annualized_volatility']:.2%}",
-            f"Sharpe Ratio: {metrics['sharpe_ratio']:.2f}",
-            f"Max Drawdown: {metrics['max_drawdown']:.2%}",
-            f"Trades: {metrics['trade_count']}",
-            f"Win Rate: {metrics['win_rate']:.1%}",
-            f"Avg Trade Duration: {metrics['avg_trade_duration']:.1f} days",
-            f"Avg Position Size: {metrics['avg_position_size']:.1%}",
-            f"Profit Factor: {metrics['profit_factor']:.2f}",
-            f"First Trade: {metrics['first_trade_date']}",
-            f"Last Trade: {metrics['last_trade_date']}",
-            f"Trade Period: {metrics['trade_duration_days']} days"
+            confidence_fig = go.Figure()
+            confidence_fig.add_trace(go.Scatter(
+                x=df.index,
+                y=confidence_scores,
+                name='Confidence',
+                line=dict(color='purple', width=1)
+            ))
+            confidence_fig.add_trace(go.Scatter(
+                x=df.index,
+                y=[0.7]*len(confidence_scores),
+                name='Threshold',
+                line=dict(color='red', width=1, dash='dash')
+            ))
+            confidence_fig.update_layout(
+                title='Confidence Scores',
+                xaxis_title='Date',
+                yaxis_title='Confidence'
+            )
+
+        # Create metrics cards
+        metrics_cards = dbc.Row([
+            dbc.Col(dbc.Card([
+                dbc.CardHeader("Returns"),
+                dbc.CardBody([
+                    html.H4(f"{metrics['total_return']:.2%}", className="card-title"),
+                    html.P(f"Annualized: {metrics['annualized_return']:.2%}")
+                ])
+            ]), width=3),
+            dbc.Col(dbc.Card([
+                dbc.CardHeader("Risk"),
+                dbc.CardBody([
+                    html.H4(f"{metrics['max_drawdown']:.2%}", className="card-title"),
+                    html.P(f"Volatility: {metrics['annualized_volatility']:.2%}")
+                ])
+            ]), width=3),
+            dbc.Col(dbc.Card([
+                dbc.CardHeader("Trades"),
+                dbc.CardBody([
+                    html.H4(f"{metrics['trade_count']}", className="card-title"),
+                    html.P(f"Win Rate: {metrics['win_rate']:.1%}")
+                ])
+            ]), width=3),
+            dbc.Col(dbc.Card([
+                dbc.CardHeader("Performance"),
+                dbc.CardBody([
+                    html.H4(f"{metrics['sharpe_ratio']:.2f}", className="card-title"),
+                    html.P(f"Profit Factor: {metrics['profit_factor']:.2f}")
+                ])
+            ]), width=3)
         ])
-        ax1.text(0.02, 0.98, metrics_text, 
-                transform=ax1.transAxes,
-                verticalalignment='top',
-                bbox=dict(boxstyle='round', facecolor='white', alpha=0.8))
+
+        # Create app layout
+        app = dash.Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP])
+        app.layout = dbc.Container([
+            dbc.Row(dbc.Col(html.H1("Backtest Results Dashboard"))),
+            metrics_cards,
+            dbc.Row(dbc.Col(dcc.Graph(figure=equity_fig))),
+            dbc.Row(dbc.Col(dcc.Graph(figure=drawdown_fig))),
+            dbc.Row(dbc.Col(dcc.Graph(figure=confidence_fig))) if confidence_scores is not None else None
+        ], fluid=True)
+
+        return app
+
+    def plot_results(self, strategy_returns, benchmark_returns, metrics, confidence_scores=None):
+        """Plot backtest results with interactive dashboard"""
+        import threading
+        import webbrowser
+        from waitress import serve
         
-        plt.tight_layout()
-        plt.show()
+        # Create a minimal date range index
+        date_range = pd.date_range(
+            start=metrics['first_trade_date'] if metrics['first_trade_date'] else pd.Timestamp.now() - pd.Timedelta(days=len(strategy_returns)),
+            periods=len(strategy_returns),
+            freq='D'
+        )
+        
+        # Create dashboard with minimal data
+        app = self.create_interactive_dashboard(
+            pd.DataFrame(index=date_range),
+            strategy_returns,
+            benchmark_returns,
+            metrics,
+            confidence_scores
+        )
+        
+        # Configure server for Windows
+        def run_server():
+            serve(app.server, host='127.0.0.1', port=8050)
+            
+        # Start server in a separate thread
+        server_thread = threading.Thread(target=run_server)
+        server_thread.daemon = True
+        server_thread.start()
+        
+        # Open browser after short delay
+        def open_browser():
+            webbrowser.open_new('http://127.0.0.1:8050/')
+            
+        threading.Timer(1.0, open_browser).start()
+        
+        # Keep main thread alive while server runs
+        try:
+            while server_thread.is_alive():
+                server_thread.join(1)
+        except KeyboardInterrupt:
+            print("\nShutting down server...")
 
 def run_backtest(df, signals, confidence_scores=None):
     """Run complete backtest with optional confidence scores"""
