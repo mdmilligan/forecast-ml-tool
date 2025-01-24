@@ -512,7 +512,10 @@ if __name__ == "__main__":
     
     # Generate signals with dynamic thresholds
     min_confidence = 0.5  # Lower confidence threshold
-    return_threshold = np.percentile(y_pred, 75)  # Use 75th percentile as threshold
+    
+    # Use only the return predictions (first column) for signals
+    return_predictions = y_pred[:, 0]
+    return_threshold = np.percentile(return_predictions, 75)  # Use 75th percentile as threshold
     
     # Get test set indices from the position-based split
     test_indices = df.index[valid_idx][split_idx:]
@@ -520,12 +523,12 @@ if __name__ == "__main__":
     # Initialize strategy with 3 bar hold period
     strategy = MLStrategy(model, scaler, feature_columns, min_hold_bars=3)
     
-    # Generate raw signals
+    # Generate raw signals using only return predictions
     raw_signals = np.where(
-        (y_pred > return_threshold) & (confidence_scores > min_confidence), 
+        (return_predictions > return_threshold) & (confidence_scores > min_confidence), 
         1, 
         np.where(
-            (y_pred < -return_threshold) & (confidence_scores > min_confidence), 
+            (return_predictions < -return_threshold) & (confidence_scores > min_confidence), 
             -1, 
             0
         )

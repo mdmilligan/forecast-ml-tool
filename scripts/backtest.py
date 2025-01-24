@@ -273,17 +273,17 @@ class Backtester:
 
         return app
 
-    def plot_results(self, strategy_returns, benchmark_returns, metrics, confidence_scores=None):
+    def plot_results(self, df, strategy_returns, benchmark_returns, metrics, confidence_scores=None):
         """Plot backtest results with interactive dashboard"""
         import threading
         import webbrowser
         from waitress import serve
         
-        # Create a minimal date range index
+        # Use actual dates from the data
         date_range = pd.date_range(
-            start=metrics['first_trade_date'] if metrics['first_trade_date'] else pd.Timestamp.now() - pd.Timedelta(days=len(strategy_returns)),
-            periods=len(strategy_returns),
-            freq='D'
+            start=metrics['first_trade_date'] if metrics['first_trade_date'] else df.index[0],
+            end=metrics['last_trade_date'] if metrics['last_trade_date'] else df.index[-1],
+            periods=len(strategy_returns)
         )
         
         # Create dashboard with minimal data
@@ -341,7 +341,7 @@ def run_backtest(df, signals, confidence_scores=None):
     )
     
     # Plot results
-    backtester.plot_results(strategy_returns, benchmark_returns, metrics, confidence_scores)
+    backtester.plot_results(df, strategy_returns, benchmark_returns, metrics, confidence_scores)
     
     return metrics
 
