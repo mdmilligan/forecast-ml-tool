@@ -98,10 +98,13 @@ def prepare_features(df):
     return X_scaled, y, scaler, feature_columns, valid_idx
 
 class MLStrategy:
-    def __init__(self, model, scaler, feature_columns):
+    def __init__(self, model, scaler, feature_columns, min_hold_bars=3):
         self.model = model
         self.scaler = scaler
         self.feature_columns = feature_columns
+        self.min_hold_bars = min_hold_bars
+        self.last_signal_time = None
+        self.current_position = 0
         
     def calculate_confidence_score(self, X_scaled):
         """Calculate confidence score based on prediction variance"""
@@ -112,6 +115,25 @@ class MLStrategy:
         std_dev = np.std(predictions, axis=0)
         confidence = 1 / (1 + std_dev)
         return confidence
+        
+    def enforce_hold_period(self, current_time, signals):
+        """Enforce minimum hold period between signals"""
+        if self.last_signal_time is None:
+            # First signal, allow it
+            self.last_signal_time = current_time
+            return signals
+            
+        # Calculate bars since last signal
+        bars_since_last = (current_time - self.last_signal_time).total_seconds() / (30 * 60)  # 30 min bars
+        
+        if bars_since_last < self.min_hold_bars:
+            # Within hold period, maintain current position
+            return self.current_position
+        else:
+            # Hold period expired, allow new signal
+            self.last_signal_time = current_time
+            self.current_position = signals
+            return signals
 
 def export_predictions(df, model_path='data/model.pkl', scaler_path='data/scaler.pkl', 
                       feature_columns_path='data/feature_columns.pkl'):
@@ -406,18 +428,27 @@ if __name__ == "__main__":
     # Get test set indices from the position-based split
     test_indices = df.index[valid_idx][split_idx:]
     
-    signals = pd.Series(
+    # Initialize strategy with 3 bar hold period
+    strategy = MLStrategy(model, scaler, feature_columns, min_hold_bars=3)
+    
+    # Generate raw signals
+    raw_signals = np.where(
+        (y_pred > return_threshold) & (confidence_scores > min_confidence), 
+        1, 
         np.where(
-            (y_pred > return_threshold) & (confidence_scores > min_confidence), 
-            1, 
-            np.where(
-                (y_pred < -return_threshold) & (confidence_scores > min_confidence), 
-                -1, 
-                0
-            )
-        ),
-        index=test_indices
+            (y_pred < -return_threshold) & (confidence_scores > min_confidence), 
+            -1, 
+            0
+        )
     )
+    
+    # Apply hold period constraint
+    signals = []
+    for i, (time, raw_signal) in enumerate(zip(test_indices, raw_signals)):
+        enforced_signal = strategy.enforce_hold_period(time, raw_signal)
+        signals.append(enforced_signal)
+    
+    signals = pd.Series(signals, index=test_indices)
     
     # Save test predictions for later backtesting
     test_results = pd.DataFrame({
