@@ -1,3 +1,4 @@
+import os
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -225,11 +226,12 @@ def train_model(X_train, y_train):
     
     # Custom scoring function to penalize frequent trading
     def position_aware_score(estimator, X, y):
-        # Get predictions
-        y_pred = estimator.predict(X)
+        # Get predictions - use only return predictions (first column)
+        y_pred = estimator.predict(X)[:, 0]
+        y_true = y.iloc[:, 0]
         
         # Calculate base MSE
-        mse = mean_squared_error(y, y_pred)
+        mse = mean_squared_error(y_true, y_pred)
         
         # Simulate position sizing based on trading frequency
         recent_trade_count = 0
@@ -289,19 +291,10 @@ def train_model(X_train, y_train):
     
     return search.best_estimator_
     
-    # Fit model with early stopping if possible
-    try:
-        model.set_params(warm_start=True)
-        for i in range(10, 201, 10):
-            model.set_params(n_estimators=i)
-            model.fit(X_train, y_train)
-            print(f"Trained with {i} estimators")
-    except:
-        # Fallback to normal training if early stopping not supported
-        model.set_params(warm_start=False, n_estimators=200)
-        model.fit(X_train, y_train)
-    
-    return model
+    # Fit the best model from search
+    best_model = search.best_estimator_
+    best_model.fit(X_train, y_train)
+    return best_model
 
 if __name__ == "__main__":
     import argparse
@@ -372,9 +365,9 @@ if __name__ == "__main__":
     print(f"Mean Squared Error: {metrics['mse']:.4f}")
     print(f"R-squared: {metrics['r2']:.4f}")
     
-    # Feature selection based on importance
-    importances = model.feature_importances_
-    std = np.std([tree.feature_importances_ for tree in model.estimators_], axis=0)
+    # Feature selection based on importance - handle multi-output
+    importances = np.mean([est.feature_importances_ for est in model.estimators_], axis=0)
+    std = np.std([est.feature_importances_ for est in model.estimators_], axis=0)
     feature_importance_df = pd.DataFrame({
         'Feature': feature_columns,
         'Importance': importances,
@@ -411,9 +404,39 @@ if __name__ == "__main__":
     plt.savefig('data/feature_importance.png', dpi=300, bbox_inches='tight')
     plt.close()
     
+    # Export feature importance to CSV
+    feature_importance_df.to_csv('data/feature_importance.csv', index=False)
+    
     # Print top 20 features
     print("\nTop 20 Feature Importances:")
     print(feature_importance_df.nlargest(20, 'Importance').to_string())
+    print("\nFull feature importance data saved to data/feature_importance.csv")
+    
+    # Update performance history
+    performance_data = {
+        'date': [pd.Timestamp.now().strftime('%Y-%m-%d %H:%M:%S')],
+        'model_version': [model.__class__.__name__],
+        'feature_count': [len(feature_columns)],
+        'train_size': [len(X_train)],
+        'test_size': [len(X_test)],
+        'mse': [mean_squared_error(y_test, model.predict(X_test))],
+        'mae': [mean_absolute_error(y_test, model.predict(X_test))],
+        'top_feature_1': [feature_importance_df.iloc[0]['Feature']],
+        'top_feature_1_importance': [feature_importance_df.iloc[0]['Importance']],
+        'top_feature_2': [feature_importance_df.iloc[1]['Feature']],
+        'top_feature_2_importance': [feature_importance_df.iloc[1]['Importance']],
+        'top_feature_3': [feature_importance_df.iloc[2]['Feature']],
+        'top_feature_3_importance': [feature_importance_df.iloc[2]['Importance']]
+    }
+    
+    # Create or append to performance history
+    performance_df = pd.DataFrame(performance_data)
+    if os.path.exists('data/performance_history.csv'):
+        history_df = pd.read_csv('data/performance_history.csv')
+        performance_df = pd.concat([history_df, performance_df], ignore_index=True)
+    
+    performance_df.to_csv('data/performance_history.csv', index=False)
+    print("\nPerformance metrics saved to data/performance_history.csv")
     
     # Create ML strategy instance
     strategy = MLStrategy(model, scaler, feature_columns)
