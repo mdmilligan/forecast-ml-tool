@@ -1,4 +1,5 @@
 import os
+import time
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -306,9 +307,18 @@ if __name__ == "__main__":
                        help='Export predictions without retraining')
     args = parser.parse_args()
     
-    # Fetch and prepare data
+    # Fetch and prepare data with progress tracking
+    print("Loading market data...")
+    start_load = time.time()
     df = load_market_data()
+    load_time = time.time() - start_load
+    print(f"Market data loaded in {load_time:.1f} seconds")
+    
+    print("Calculating technical indicators...")
+    start_indicators = time.time()
     df = calculate_technical_indicators(df)
+    indicators_time = time.time() - start_indicators
+    print(f"Technical indicators calculated in {indicators_time:.1f} seconds")
     
     if args.export_only:
         print("Exporting predictions from existing model...")
@@ -331,11 +341,20 @@ if __name__ == "__main__":
     print(f"Test set size: {len(X_test)} samples (10% of total data)")
     print(f"Training set size: {len(X_train)} samples (90% of total data)")
     
-    # Train and save model
+    # Train and save model with progress tracking
+    print("\nTraining model...")
+    start_train = time.time()
     model = train_model(X_train, y_train)
+    train_time = time.time() - start_train
+    print(f"Model training completed in {train_time:.1f} seconds")
+    
+    print("Saving model artifacts...")
+    start_save = time.time()
     joblib.dump(model, 'data/model.pkl')
     joblib.dump(scaler, 'data/scaler.pkl')
     joblib.dump(feature_columns, 'data/feature_columns.pkl')
+    save_time = time.time() - start_save
+    print(f"Model artifacts saved in {save_time:.1f} seconds")
     
     # Enhanced model evaluation
     y_pred = model.predict(X_test)
@@ -505,5 +524,12 @@ if __name__ == "__main__":
         traceback.print_exc()
         raise  # Re-raise exception to fail visibly
     
-    print(f"\nModel training complete! Time taken: {datetime.now() - start_time}")
+    total_time = time.time() - start_time
+    print(f"\nModel training pipeline complete!")
+    print(f"Total time: {total_time:.1f} seconds")
+    print("Breakdown:")
+    print(f"- Data loading: {load_time:.1f}s ({load_time/total_time:.1%})")
+    print(f"- Indicators: {indicators_time:.1f}s ({indicators_time/total_time:.1%})")
+    print(f"- Model training: {train_time:.1f}s ({train_time/total_time:.1%})")
+    print(f"- Model saving: {save_time:.1f}s ({save_time/total_time:.1%})")
     print("\nRun backtest.py separately to evaluate model performance")
