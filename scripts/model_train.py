@@ -4,6 +4,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.ensemble import RandomForestRegressor
+from tqdm import tqdm
 from sklearn.exceptions import ConvergenceWarning
 from pathlib import Path
 import logging
@@ -292,9 +293,37 @@ def train_model(X_train, y_train):
     
     return search.best_estimator_
     
-    # Fit the best model from search
+    # Fit the best model from search with progress tracking
     best_model = search.best_estimator_
-    best_model.fit(X_train, y_train)
+    
+    # Add progress tracking for RandomForest
+    if hasattr(best_model.estimator, 'n_estimators'):
+        from tqdm import tqdm
+        n_trees = best_model.estimator.n_estimators
+        start_time = time.time()
+        
+        # Use warm start to track progress
+        best_model.estimator.set_params(warm_start=True)
+        for i in tqdm(range(10, n_trees + 1, 10), desc="Training trees", unit="trees"):
+            best_model.estimator.set_params(n_estimators=i)
+            best_model.fit(X_train, y_train)
+            
+            # Calculate progress
+            elapsed = time.time() - start_time
+            trees_per_sec = i / elapsed
+            remaining = (n_trees - i) / trees_per_sec
+            
+            # Update progress bar description
+            tqdm.write(f"Elapsed: {elapsed:.1f}s | Remaining: {remaining:.1f}s")
+        
+        print()  # New line after progress
+    else:
+        # Fallback for non-tree models
+        start_time = time.time()
+        best_model.fit(X_train, y_train)
+        elapsed = time.time() - start_time
+        print(f"Training completed in {elapsed:.1f} seconds")
+    
     return best_model
 
 if __name__ == "__main__":
@@ -370,15 +399,33 @@ if __name__ == "__main__":
         'test_set_size': len(X_test)
     }
     
-    # Update performance history
+    # Update performance history with validation
     performance_file = Path('data/performance_history.csv')
-    if performance_file.exists():
-        performance_history = pd.read_csv(performance_file)
-    else:
-        performance_history = pd.DataFrame(columns=metrics.keys())
+    try:
+        if performance_file.exists():
+            performance_history = pd.read_csv(performance_file)
+        else:
+            performance_history = pd.DataFrame(columns=metrics.keys())
+            
+        # Convert metrics to DataFrame and concatenate
+        metrics_df = pd.DataFrame([metrics])
+        performance_history = pd.concat([performance_history, metrics_df], ignore_index=True)
         
-    performance_history = performance_history.append(metrics, ignore_index=True)
-    performance_history.to_csv(performance_file, index=False)
+        # Validate before saving
+        if not all(col in performance_history.columns for col in metrics.keys()):
+            raise ValueError("Performance history columns mismatch")
+            
+        performance_history.to_csv(performance_file, index=False)
+        
+        # Verify file was written
+        if not performance_file.exists():
+            raise RuntimeError("Failed to save performance history")
+            
+        print(f"\nPerformance history updated at {performance_file}")
+        
+    except Exception as e:
+        print(f"\nError updating performance history: {str(e)}")
+        raise
     
     print(f"\nModel Evaluation on Test Set:")
     print(f"Mean Squared Error: {metrics['mse']:.4f}")
@@ -492,37 +539,45 @@ if __name__ == "__main__":
     
     signals = pd.Series(signals, index=test_indices)
     
-    # Save test predictions for later backtesting
+    # Save test predictions with proper column structure
     test_results = pd.DataFrame({
-        'Actual': y_test,
-        'Predicted': y_pred,
+        'Actual_Return': y_test.iloc[:, 0],
+        'Actual_Exit_Long': y_test.iloc[:, 1],
+        'Actual_Exit_Short': y_test.iloc[:, 2],
+        'Predicted_Return': y_pred[:, 0],
+        'Predicted_Exit_Long': y_pred[:, 1],
+        'Predicted_Exit_Short': y_pred[:, 2],
         'Signal': signals,
-        'Confidence': confidence_scores  # Add confidence scores
+        'Confidence': confidence_scores
     }, index=test_indices)
     
+    # Ensure data directory exists
+    data_dir = Path('data')
+    data_dir.mkdir(exist_ok=True)
+    
+    # Save predictions with validation
+    file_path = data_dir / 'test_predictions.csv'
     try:
-        import os
-        from pathlib import Path
-        
-        # Create data directory if it doesn't exist
-        data_dir = Path('data')
-        data_dir.mkdir(exist_ok=True)
-        
-        # Save with explicit path and error handling
-        file_path = data_dir / 'test_predictions.csv'
-        # Force overwrite and ensure proper datetime formatting
+        # Save with explicit datetime formatting
         test_results.to_csv(file_path, index=True, date_format='%Y-%m-%d %H:%M:%S%z')
-        print(f"\nSuccessfully saved test predictions to {file_path.absolute()}")
         
         # Verify file was written
         if not file_path.exists():
-            raise FileNotFoundError(f"Failed to create {file_path}")
+            raise RuntimeError(f"Failed to create {file_path}")
             
+        # Verify file contents
+        saved_data = pd.read_csv(file_path, index_col=0, parse_dates=True)
+        if len(saved_data) != len(test_results):
+            raise RuntimeError("Saved data length mismatch")
+            
+        print(f"\nSuccessfully saved test predictions to {file_path.absolute()}")
+        print(f"Saved {len(saved_data)} rows with columns: {list(saved_data.columns)}")
+        
     except Exception as e:
         print(f"\nError saving predictions: {str(e)}")
-        import traceback
-        traceback.print_exc()
-        raise  # Re-raise exception to fail visibly
+        if file_path.exists():
+            file_path.unlink()  # Clean up partial file
+        raise
     
     total_time = time.time() - start_time
     print(f"\nModel training pipeline complete!")
@@ -532,4 +587,31 @@ if __name__ == "__main__":
     print(f"- Indicators: {indicators_time:.1f}s ({indicators_time/total_time:.1%})")
     print(f"- Model training: {train_time:.1f}s ({train_time/total_time:.1%})")
     print(f"- Model saving: {save_time:.1f}s ({save_time/total_time:.1%})")
-    print("\nRun backtest.py separately to evaluate model performance")
+    
+    # Verify all outputs exist
+    required_files = [
+        'data/model.pkl',
+        'data/scaler.pkl',
+        'data/feature_columns.pkl',
+        'data/test_predictions.csv',
+        'data/feature_importance.png',
+        'data/feature_importance.csv',
+        'data/performance_history.csv'
+    ]
+    
+    print("\nOutput verification:")
+    missing_files = []
+    for file in required_files:
+        if Path(file).exists():
+            print(f"- {file} exists")
+        else:
+            missing_files.append(file)
+            print(f"- {file} MISSING")
+    
+    if missing_files:
+        print("\nWarning: Some output files are missing!")
+        print("Please check the logs for errors")
+    else:
+        print("\nAll output files created successfully")
+    
+    print("\nYou can now run backtest.py to evaluate performance")
