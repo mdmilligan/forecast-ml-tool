@@ -199,6 +199,26 @@ def calculate_technical_indicators(df: pd.DataFrame, params: dict = None) -> pd.
             0
         )
         
+        # Distance to 30-min BB
+        df['dist_to_bb_upper'] = ((df['spy_close'] - df['bb_upper']) / df['bb_upper']) * 100
+        df['dist_to_bb_lower'] = ((df['spy_close'] - df['bb_lower']) / df['bb_lower']) * 100
+        
+        # 1-Day Equivalent Bollinger Bands
+        df['bb_1d_middle'] = df['spy_close'].rolling(window=13).mean()
+        bb_1d_std = df['spy_close'].rolling(window=13).std()
+        df['bb_1d_upper'] = df['bb_1d_middle'] + 2 * bb_1d_std
+        df['bb_1d_lower'] = df['bb_1d_middle'] - 2 * bb_1d_std
+        
+        df['bb_1d_percent_b'] = np.where(
+            (df['bb_1d_upper'] - df['bb_1d_lower']) != 0,
+            (df['spy_close'] - df['bb_1d_lower']) / (df['bb_1d_upper'] - df['bb_1d_lower']),
+            0
+        )
+        
+        # Distance to 1D BB
+        df['dist_to_bb_1d_upper'] = ((df['spy_close'] - df['bb_1d_upper']) / df['bb_1d_upper']) * 100
+        df['dist_to_bb_1d_lower'] = ((df['spy_close'] - df['bb_1d_lower']) / df['bb_1d_lower']) * 100
+        
         df['bb_bandwidth'] = np.where(
             df['bb_middle'] != 0,
             ((df['bb_upper'] - df['bb_lower']) / df['bb_middle']) * 100,
@@ -260,6 +280,21 @@ def calculate_technical_indicators(df: pd.DataFrame, params: dict = None) -> pd.
         df['stop_loss_short'] = df['spy_high'].rolling(window=5).max() + 1.5 * df['atr_20']
         df['take_profit_long'] = df['spy_close'] + 2.5 * df['atr_20']
         df['take_profit_short'] = df['spy_close'] - 2.5 * df['atr_20']
+        
+        # Donchian Channel (20-period)
+        df['donchian_upper'] = df['spy_high'].rolling(window=20).max()
+        df['donchian_lower'] = df['spy_low'].rolling(window=20).min()
+        df['donchian_middle'] = (df['donchian_upper'] + df['donchian_lower']) / 2
+        
+        # Donchian Channel Width
+        df['donchian_width'] = df['donchian_upper'] - df['donchian_lower']
+        
+        # Donchian Channel Position
+        df['donchian_position'] = np.where(
+            df['donchian_width'] != 0,
+            (df['spy_close'] - df['donchian_lower']) / df['donchian_width'],
+            0
+        )
         
         # Clean up intermediate columns
         columns_to_drop = ['hl2', 'ad_ratio']
