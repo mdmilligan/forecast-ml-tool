@@ -296,6 +296,104 @@ def calculate_technical_indicators(df: pd.DataFrame, params: dict = None) -> pd.
             0
         )
         
+        # Candle body calculations
+        df['candle_body'] = df['spy_close'] - df['spy_open']
+        df['upper_wick'] = df['spy_high'] - df[['spy_open', 'spy_close']].max(axis=1)
+        df['lower_wick'] = df[['spy_open', 'spy_close']].min(axis=1) - df['spy_low']
+        df['candle_relative_position'] = np.where(
+            (df['spy_high'] - df['spy_low']) != 0,
+            (df['spy_close'] - df['spy_low']) / (df['spy_high'] - df['spy_low']),
+            0.5
+        )
+        df['candle_direction'] = (df['spy_close'] > df['spy_open']).astype(int)
+        
+        # Support/Resistance Features
+        def detect_bounces(df, level_col, threshold_pct=0.01):
+            """
+            Detect bounces near key levels (support/resistance)
+            
+            Args:
+                df: DataFrame with price data
+                level_col: Column name of the level to check (e.g. 'SMA20', 'bb_lower')
+                threshold_pct: Percentage threshold to consider a bounce (default 1%)
+            
+            Returns:
+                Series with bounce signals (1 = bounce up, -1 = bounce down, 0 = no bounce)
+            """
+            level = df[level_col]
+            threshold = level * threshold_pct
+            
+            # Detect bounces up (price approaches from below then moves up)
+            bounce_up = (
+                (df['spy_low'] <= level + threshold) & 
+                (df['spy_close'] > level + threshold)
+            )
+            
+            # Detect bounces down (price approaches from above then moves down)
+            bounce_down = (
+                (df['spy_high'] >= level - threshold) & 
+                (df['spy_close'] < level - threshold)
+            )
+            
+            return bounce_up.astype(int) - bounce_down.astype(int)
+        
+        # Add bounce detection for key levels (SMA and 1D BB)
+        df['bounce_SMA5'] = detect_bounces(df, 'SMA5')
+        df['bounce_SMA10'] = detect_bounces(df, 'SMA10')
+        df['bounce_SMA20'] = detect_bounces(df, 'SMA20') 
+        df['bounce_SMA50'] = detect_bounces(df, 'SMA50')
+        df['bounce_SMA100'] = detect_bounces(df, 'SMA100')
+        df['bounce_bb_1d_upper'] = detect_bounces(df, 'bb_1d_upper')
+        df['bounce_bb_1d_lower'] = detect_bounces(df, 'bb_1d_lower')
+        
+        # Add strength of bounce (how far price moved away)
+        df['bounce_strength_SMA5'] = np.where(
+            df['bounce_SMA5'] != 0,
+            (df['spy_close'] - df['SMA5']) / df['SMA5'],
+            0
+        )
+        df['bounce_strength_SMA10'] = np.where(
+            df['bounce_SMA10'] != 0,
+            (df['spy_close'] - df['SMA10']) / df['SMA10'],
+            0
+        )
+        df['bounce_strength_SMA20'] = np.where(
+            df['bounce_SMA20'] != 0,
+            (df['spy_close'] - df['SMA20']) / df['SMA20'],
+            0
+        )
+        df['bounce_strength_SMA50'] = np.where(
+            df['bounce_SMA50'] != 0,
+            (df['spy_close'] - df['SMA50']) / df['SMA50'],
+            0
+        )
+        df['bounce_strength_SMA100'] = np.where(
+            df['bounce_SMA100'] != 0,
+            (df['spy_close'] - df['SMA100']) / df['SMA100'],
+            0
+        )
+        df['bounce_strength_bb_1d_upper'] = np.where(
+            df['bounce_bb_1d_upper'] != 0,
+            (df['spy_close'] - df['bb_1d_upper']) / df['bb_1d_upper'],
+            0
+        )
+        df['bounce_strength_bb_1d_lower'] = np.where(
+            df['bounce_bb_1d_lower'] != 0,
+            (df['spy_close'] - df['bb_1d_lower']) / df['bb_1d_lower'],
+            0
+        )
+        
+        # Add recent touch counts (how many times price has touched level recently)
+        for level in ['SMA5', 'SMA10', 'SMA20', 'SMA50', 'SMA100', 'bb_1d_upper', 'bb_1d_lower']:
+            df[f'touch_count_{level}'] = (
+                (df['spy_low'] <= df[level] * 1.01) & 
+                (df['spy_high'] >= df[level] * 0.99)
+            ).rolling(window=20).sum()
+        
+        # Add proximity to levels
+        for level in ['SMA5', 'SMA10', 'SMA20', 'SMA50', 'SMA100', 'bb_1d_upper', 'bb_1d_lower']:
+            df[f'proximity_{level}'] = (df['spy_close'] - df[level]) / df[level]
+        
         # Clean up intermediate columns
         columns_to_drop = ['hl2', 'ad_ratio']
         df = df.drop(columns_to_drop, axis=1, errors='ignore')
