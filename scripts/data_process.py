@@ -424,8 +424,40 @@ def calculate_technical_indicators(df: pd.DataFrame, params: dict = None) -> pd.
         df['entropy_1d'] = df['spy_close'].rolling(window=26).apply(rolling_entropy)
         df['entropy_5d'] = df['spy_close'].rolling(window=130).apply(rolling_entropy)
         
+        # Market State Classification
+        def classify_market_state(df):
+            # Calculate composite scores using most relevant indicators
+            df['trend_score'] = (
+                (1 - df['entropy_1d']) +         # Low entropy favors trending
+                df['autocorr_30m'].clip(0, 1) +  # High autocorrelation favors trending
+                df['z_score_1d'].abs() +         # Extreme z-scores favor trending
+                ((df['percentile_1d'] - 50).abs() / 50)  # Extreme percentiles favor trending
+            ) / 4  # Normalize to 0-1 range
+            
+            df['chop_score'] = (
+                df['entropy_1d'] +               # High entropy favors choppy
+                (1 - df['autocorr_30m'].abs()) + # Low autocorrelation favors choppy
+                (1 - df['z_score_1d'].abs()) +   # Z-scores near zero favor choppy
+                (1 - ((df['percentile_1d'] - 50).abs() / 50))  # Percentile near 50 favors choppy
+            ) / 4  # Normalize to 0-1 range
+            
+            # Classify market state with clear thresholds
+            conditions = [
+                (df['trend_score'] > 0.7) & (df['chop_score'] < 0.3),  # Strong trend
+                (df['chop_score'] > 0.7) & (df['trend_score'] < 0.3),  # Strong chop
+                (df['trend_score'].between(0.4, 0.7)) |               # Transitioning
+                (df['chop_score'].between(0.4, 0.7))                  # Transitioning
+            ]
+            choices = ['trending', 'choppy', 'transitioning']
+            
+            df['market_state'] = np.select(conditions, choices, default='uncertain')
+            return df
+        
+        # Apply market state classification
+        df = classify_market_state(df)
+        
         # Clean up intermediate columns
-        columns_to_drop = ['hl2', 'ad_ratio']
+        columns_to_drop = ['hl2', 'ad_ratio', 'trend_score', 'chop_score']
         df = df.drop(columns_to_drop, axis=1, errors='ignore')
         
         return df
