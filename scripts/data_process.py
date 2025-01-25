@@ -239,6 +239,8 @@ def calculate_technical_indicators(df: pd.DataFrame, params: dict = None) -> pd.
         df['ad_ratio'] = df['spy_close'].diff() / tr
         df['ad_ratio'] = df['ad_ratio'].fillna(0)
         df['ad_ratio'] = (1 - params['admf_weight']) * df['ad_ratio'] + np.sign(df['ad_ratio']) * params['admf_weight']
+        # Add binary zone indicator
+        df['admf_above_zero'] = (df['admf'] > 0).astype(int)
         
         if params['admf_price_enable']:
             df['hlc3'] = (df['spy_high'] + df['spy_low'] + df['spy_close']) / 3
@@ -270,9 +272,13 @@ def calculate_technical_indicators(df: pd.DataFrame, params: dict = None) -> pd.
         df['fisher'] = 0.5 * np.log((1 + value) / (1 - value))
         df['fisher'] = df['fisher'].ewm(alpha=0.5, adjust=False).mean()
         df['fisher_trigger'] = df['fisher'].shift(1)
+        # Add binary zone indicator
+        df['fisher_above_zero'] = (df['fisher'] > 0).astype(int)
               
         # Calculate Ultimate RSI
         df['ultimate_rsi'], df['ultimate_rsi_signal'] = calculate_ultimate_rsi(df)
+        # Add binary zone indicator
+        df['ursi_above_50'] = (df['ultimate_rsi'] > 50).astype(int)
         
         # Calculate stop-loss and take-profit levels
         df['atr_20'] = df['atr'].rolling(window=20).mean()

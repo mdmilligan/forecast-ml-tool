@@ -33,7 +33,7 @@ def prepare_features(df):
         'spy_close', 'spy_volume', 'vix_close', 'uup_close',
         
         # Moving Averages
-        'EMA21', 'EMA50', 'SMA5', 'SMA10', 'SMA20', 'SMA50', 'SMA100', 'SMA150', 'SMA200',
+        # 'EMA21', 'EMA50', 'SMA5', 'SMA10', 'SMA20', 'SMA50', 'SMA100', 'SMA150', 'SMA200',
         
         # Bollinger Bands
         'bb_percent_b', 'bb_bandwidth', 'bb_1d_percent_b',
@@ -42,10 +42,10 @@ def prepare_features(df):
         'volatility', 'atr', 'atr_20',
         
         # Momentum Indicators
-        'admf', 'roc', 'ultimate_rsi', 'ultimate_rsi_signal',
+        'admf', 'admf_above_zero', 'roc', 'ultimate_rsi', 'ultimate_rsi_signal', 'ursi_above_50',
         
         # Fisher Transform
-        'fisher', 'fisher_trigger',
+        'fisher', 'fisher_trigger', 'fisher_above_zero',
         
         # Distance to MAs
         'dist_to_EMA21', 'dist_to_EMA50', 'dist_to_5D_SMA', 'dist_to_20D_SMA', 
