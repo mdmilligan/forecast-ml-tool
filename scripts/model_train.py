@@ -30,7 +30,8 @@ def prepare_features(df):
     """Prepare features for model training using all technical indicators"""
     feature_columns = [
         # Price and Volume
-        'spy_close', 'spy_volume', 'vix_close', 'uup_close',
+        'spy_open', 'spy_high', 'spy_low', 'spy_close', 
+        'spy_volume', 'vix_close', 'uup_close',
         
         # Moving Averages
         # 'EMA21', 'EMA50', 'SMA5', 'SMA10', 'SMA20', 'SMA50', 'SMA100', 'SMA150', 'SMA200',
@@ -467,14 +468,8 @@ if __name__ == "__main__":
         'Std': std
     }).sort_values('Importance', ascending=False)
     
-    # Select top 50% of features
-    threshold = np.median(feature_importance_df['Importance'])
-    selected_features = feature_importance_df[feature_importance_df['Importance'] > threshold]['Feature'].tolist()
-    print(f"\nSelected {len(selected_features)} features out of {len(feature_columns)}")
-    print(f"Selected features: {selected_features}")
-    
-    # Update feature columns
-    feature_columns = selected_features
+    # Keep all features
+    print(f"\nUsing all {len(feature_columns)} features")
     
     # Enhanced feature importance visualization
     plt.figure(figsize=(12, 8))
@@ -492,6 +487,13 @@ if __name__ == "__main__":
     plt.ylabel('Features', fontsize=12)
     plt.grid(True, alpha=0.3)
     
+    # Add vertical line at median importance
+    median_importance = np.median(sorted_features['Importance'])
+    plt.axvline(median_importance, color='red', linestyle='--', alpha=0.5)
+    plt.text(median_importance + 0.01, len(sorted_features)*0.9, 
+             f'Median: {median_importance:.3f}', 
+             color='red', fontsize=10)
+    
     # Save high-quality version
     plt.tight_layout()
     plt.savefig('data/feature_importance.png', dpi=300, bbox_inches='tight')
@@ -500,9 +502,10 @@ if __name__ == "__main__":
     # Export feature importance to CSV
     feature_importance_df.to_csv('data/feature_importance.csv', index=False)
     
-    # Print top 20 features
+    # Print top 20 features with formatting
     print("\nTop 20 Feature Importances:")
-    print(feature_importance_df.nlargest(20, 'Importance').to_string())
+    top_20 = feature_importance_df.nlargest(20, 'Importance')
+    print(top_20[['Feature', 'Importance', 'Std']].to_string(index=False))
     print("\nFull feature importance data saved to data/feature_importance.csv")
     
     # Update performance history
