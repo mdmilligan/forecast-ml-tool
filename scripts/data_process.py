@@ -136,15 +136,55 @@ def calculate_technical_indicators(df: pd.DataFrame, params: dict = None) -> pd.
     
     try:
         # Moving averages (converted to daily periods - 26 periods per day)
-        df['EMA21'] = df[params['price_column']].ewm(span=21*26, adjust=False).mean()
-        df['EMA50'] = df[params['price_column']].ewm(span=50*26, adjust=False).mean()
+        df['EMA21'] = df[params['price_column']].ewm(span=21*13, adjust=False).mean()
+        df['EMA50'] = df[params['price_column']].ewm(span=50*13, adjust=False).mean()
         # Daily SMAs (26 periods per day for 30-minute data)
-        df['SMA5'] = df[params['price_column']].rolling(window=5*26).mean()  # 5-day SMA
-        df['SMA20'] = df[params['price_column']].rolling(window=20*26).mean()  # 20-day SMA
-        df['SMA50'] = df[params['price_column']].rolling(window=50*26).mean()  # 50-day SMA
-        df['SMA100'] = df[params['price_column']].rolling(window=100*26).mean()  # 100-day SMA
-        df['SMA150'] = df[params['price_column']].rolling(window=150*26).mean()  # 150-day SMA
-        df['SMA200'] = df[params['price_column']].rolling(window=200*26).mean()  # 200-day SMA
+        df['SMA5'] = df[params['price_column']].rolling(window=5*13).mean()  # 5-day SMA
+        df['SMA10'] = df[params['price_column']].rolling(window=10*13).mean()  # 10-day SMA
+        df['SMA20'] = df[params['price_column']].rolling(window=20*13).mean()  # 20-day SMA
+        df['SMA50'] = df[params['price_column']].rolling(window=50*13).mean()  # 50-day SMA
+        df['SMA100'] = df[params['price_column']].rolling(window=100*13).mean()  # 100-day SMA
+        df['SMA150'] = df[params['price_column']].rolling(window=150*13).mean()  # 150-day SMA
+        df['SMA200'] = df[params['price_column']].rolling(window=200*13).mean()  # 200-day SMA
+        
+        # Distance to MAs
+        df['dist_to_EMA21'] = ((df[params['price_column']] - df['EMA21']) / df['EMA21']) * 100
+        df['dist_to_EMA50'] = ((df[params['price_column']] - df['EMA50']) / df['EMA50']) * 100
+        df['dist_to_5D_SMA'] = ((df[params['price_column']] - df['SMA5']) / df['SMA5']) * 100
+        df['dist_to_20D_SMA'] = ((df[params['price_column']] - df['SMA20']) / df['SMA20']) * 100
+        df['dist_to_50D_SMA'] = ((df[params['price_column']] - df['SMA50']) / df['SMA50']) * 100
+        df['dist_to_100D_SMA'] = ((df[params['price_column']] - df['SMA100']) / df['SMA100']) * 100
+        df['dist_to_150D_SMA'] = ((df[params['price_column']] - df['SMA150']) / df['SMA150']) * 100
+        df['dist_to_200D_SMA'] = ((df[params['price_column']] - df['SMA200']) / df['SMA200']) * 100
+        
+        # Slope calculations
+        rad2degree = 180/3.14159265359
+        lookback_periods = params['lookback']*13
+        
+        # 5D SMA Slope
+        df['5D_Slope'] = rad2degree * np.arctan(
+            (df['SMA5'] - df['SMA5'].shift(lookback_periods)) / lookback_periods
+        )
+        
+        # EMA21 Slope
+        df['EMA21_Slope'] = rad2degree * np.arctan(
+            (df['EMA21'] - df['EMA21'].shift(lookback_periods)) / lookback_periods
+        )
+        
+        # EMA50 Slope
+        df['EMA50_Slope'] = rad2degree * np.arctan(
+            (df['EMA50'] - df['EMA50'].shift(lookback_periods)) / lookback_periods
+        )
+        
+        # 20D SMA Slope
+        df['20D_Slope'] = rad2degree * np.arctan(
+            (df['SMA20'] - df['SMA20'].shift(lookback_periods)) / lookback_periods
+        )
+        
+        # 50D SMA Slope
+        df['50D_Slope'] = rad2degree * np.arctan(
+            (df['SMA50'] - df['SMA50'].shift(lookback_periods)) / lookback_periods
+        )
         
         # Bollinger Bands
         df['bb_middle'] = df['spy_close'].rolling(window=20).mean()
@@ -210,18 +250,7 @@ def calculate_technical_indicators(df: pd.DataFrame, params: dict = None) -> pd.
         df['fisher'] = 0.5 * np.log((1 + value) / (1 - value))
         df['fisher'] = df['fisher'].ewm(alpha=0.5, adjust=False).mean()
         df['fisher_trigger'] = df['fisher'].shift(1)
-        
-        # Distance to MAs
-        df['dist_to_EMA21'] = ((df[params['price_column']] - df['EMA21']) / df['EMA21']) * 100
-        df['dist_to_EMA50'] = ((df[params['price_column']] - df['EMA50']) / df['EMA50']) * 100
-        df['dist_to_5day_SMA'] = ((df[params['price_column']] - df['SMA5']) / df['SMA5']) * 100
-        
-        # 5 Day SMA Slope
-        rad2degree = 180/3.14159265359
-        df['slope'] = rad2degree * np.arctan(
-            (df['SMA5'] - df['SMA5'].shift(params['lookback']*26)) / (params['lookback']*26)
-        )
-        
+              
         # Calculate Ultimate RSI
         df['ultimate_rsi'], df['ultimate_rsi_signal'] = calculate_ultimate_rsi(df)
         
