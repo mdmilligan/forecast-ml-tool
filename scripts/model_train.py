@@ -33,28 +33,58 @@ def prepare_features(df):
         'spy_close', 'spy_volume', 'vix_close', 'uup_close',
         
         # Moving Averages
-        'EMA21', 'EMA50', 'SMA20', 'SMA50',
+        'EMA21', 'EMA50', 'SMA5', 'SMA10', 'SMA20', 'SMA50', 'SMA100', 'SMA150', 'SMA200',
         
         # Bollinger Bands
-        'bb_percent_b', 'bb_bandwidth',
+        'bb_percent_b', 'bb_bandwidth', 'bb_1d_percent_b',
         
         # Volatility
-        'volatility', 'atr',
+        'volatility', 'atr', 'atr_20',
         
         # Momentum Indicators
-        'admf', 'roc', 
+        'admf', 'roc', 'ultimate_rsi', 'ultimate_rsi_signal',
         
         # Fisher Transform
         'fisher', 'fisher_trigger',
         
         # Distance to MAs
-        'dist_to_EMA21', 'dist_to_EMA50', 'dist_to_5day_SMA',
+        'dist_to_EMA21', 'dist_to_EMA50', 'dist_to_5D_SMA', 'dist_to_20D_SMA', 
+        'dist_to_50D_SMA', 'dist_to_100D_SMA', 'dist_to_150D_SMA', 'dist_to_200D_SMA',
         
         # Slope
-        'slope',
+        '5D_Slope', 'EMA21_Slope', 'EMA50_Slope', '20D_Slope', '50D_Slope',
         
-        # Ultimate RSI
-        'ultimate_rsi', 'ultimate_rsi_signal'
+        # Donchian Channel
+        'donchian_position', 'donchian_width',
+        
+        # Candle Features
+        'candle_body', 'upper_wick', 'lower_wick', 'candle_relative_position', 'candle_direction',
+        
+        # Bounce Features
+        'bounce_SMA5', 'bounce_SMA10', 'bounce_SMA20', 'bounce_SMA50', 'bounce_SMA100',
+        'bounce_bb_1d_upper', 'bounce_bb_1d_lower',
+        'bounce_strength_SMA5', 'bounce_strength_SMA10', 'bounce_strength_SMA20',
+        'bounce_strength_SMA50', 'bounce_strength_SMA100',
+        'bounce_strength_bb_1d_upper', 'bounce_strength_bb_1d_lower',
+        
+        # Touch Counts
+        'touch_count_SMA5', 'touch_count_SMA10', 'touch_count_SMA20', 
+        'touch_count_SMA50', 'touch_count_SMA100',
+        'touch_count_bb_1d_upper', 'touch_count_bb_1d_lower',
+        
+        # Proximity Features
+        'proximity_SMA5', 'proximity_SMA10', 'proximity_SMA20', 
+        'proximity_SMA50', 'proximity_SMA100',
+        'proximity_bb_1d_upper', 'proximity_bb_1d_lower',
+        
+        # Statistical Features
+        'autocorr_30m', 'skewness_1d', 'skewness_5d',
+        'z_score_1d', 'z_score_5d',
+        'percentile_1d', 'percentile_5d',
+        'entropy_1d', 'entropy_5d',
+        
+        # Market State
+        'market_state'
     ]
 
     # Create feature matrix
@@ -70,17 +100,27 @@ def prepare_features(df):
     y_exit_short = ((df['spy_high'].shift(-1) >= df['stop_loss_short']) | 
                    (df['spy_low'].shift(-1) <= df['take_profit_short'])).astype(int)
     
+    # Add market state as additional target
+    y_market_state = pd.get_dummies(df['market_state'].shift(-1), prefix='market')
+    
     # Combine into multi-output target
-    y = pd.DataFrame({
-        'return': y_return,
-        'exit_long': y_exit_long,
-        'exit_short': y_exit_short
-    })
+    y = pd.concat([
+        pd.DataFrame({
+            'return': y_return,
+            'exit_long': y_exit_long,
+            'exit_short': y_exit_short
+        }),
+        y_market_state
+    ], axis=1)
     
     # Drop rows with missing values
     valid_idx = X.notna().all(axis=1) & y.notna().all(axis=1)
     X = X[valid_idx]
     y = y[valid_idx]
+    
+    # Convert market_state to categorical codes
+    if 'market_state' in X.columns:
+        X['market_state'] = X['market_state'].astype('category').cat.codes
     
     scaler = StandardScaler()
     X_scaled = scaler.fit_transform(X)
