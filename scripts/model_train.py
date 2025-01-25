@@ -1,28 +1,30 @@
 import os
 import time
-import pandas as pd
-import numpy as np
-import matplotlib.pyplot as plt
-from sklearn.ensemble import RandomForestRegressor
-from tqdm import tqdm
-from sklearn.exceptions import ConvergenceWarning
-from pathlib import Path
 import logging
 import traceback
 from datetime import datetime
-from sklearn.metrics import (mean_squared_error, r2_score, 
-                            mean_absolute_error, explained_variance_score)
+from pathlib import Path
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import joblib
+from tqdm import tqdm
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.multioutput import MultiOutputRegressor
+from sklearn.model_selection import RandomizedSearchCV
+from sklearn.preprocessing import StandardScaler
+from sklearn.metrics import (
+    mean_squared_error,
+    r2_score,
+    mean_absolute_error,
+    explained_variance_score
+)
+from sklearn.exceptions import ConvergenceWarning
+from data_process import load_market_data, calculate_technical_indicators
 
 # Initialize logger
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-from sklearn.preprocessing import StandardScaler
-from sklearn.metrics import mean_squared_error, r2_score
-import joblib
-import pandas as pd
-from datetime import datetime
-import matplotlib.pyplot as plt
-from data_process import load_market_data, calculate_technical_indicators
 
 def prepare_features(df):
     """Prepare features for model training using all technical indicators"""
@@ -44,7 +46,6 @@ def prepare_features(df):
         
         # Fisher Transform
         'fisher', 'fisher_trigger',
-        'fisher_cross_above', 'fisher_cross_below',
         
         # Distance to MAs
         'dist_to_EMA21', 'dist_to_EMA50', 'dist_to_5day_SMA',
@@ -55,20 +56,6 @@ def prepare_features(df):
         # Ultimate RSI
         'ultimate_rsi', 'ultimate_rsi_signal'
     ]
-    
-    # Add crossover features
-    df['fisher_cross_above'] = ((df['fisher'] > df['fisher_trigger']) & 
-                               (df['fisher'].shift() <= df['fisher_trigger'].shift())).astype(int)
-    df['fisher_cross_below'] = ((df['fisher'] < df['fisher_trigger']) & 
-                               (df['fisher'].shift() >= df['fisher_trigger'].shift())).astype(int)
-    df['ursi_cross_above'] = ((df['ultimate_rsi'] > df['ultimate_rsi_signal']) & 
-                             (df['ultimate_rsi'].shift() <= df['ultimate_rsi_signal'].shift())).astype(int)
-    df['ursi_cross_below'] = ((df['ultimate_rsi'] < df['ultimate_rsi_signal']) & 
-                             (df['ultimate_rsi'].shift() >= df['ultimate_rsi_signal'].shift())).astype(int)
-
-    # Add crossover features to feature columns
-    feature_columns.extend(['fisher_cross_above', 'fisher_cross_below', 
-                          'ursi_cross_above', 'ursi_cross_below'])
 
     # Create feature matrix
     X = df[feature_columns]
