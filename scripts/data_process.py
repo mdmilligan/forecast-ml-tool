@@ -394,6 +394,36 @@ def calculate_technical_indicators(df: pd.DataFrame, params: dict = None) -> pd.
         for level in ['SMA5', 'SMA10', 'SMA20', 'SMA50', 'SMA100', 'bb_1d_upper', 'bb_1d_lower']:
             df[f'proximity_{level}'] = (df['spy_close'] - df[level]) / df[level]
         
+        # Statistical calculations
+        # Autocorrelation (1-period lag)
+        df['autocorr_30m'] = df['spy_close'].autocorr(lag=1)
+        
+        # Skewness (daily and weekly)
+        df['skewness_1d'] = df['spy_close'].rolling(window=26).skew()  # 1 trading day
+        df['skewness_5d'] = df['spy_close'].rolling(window=130).skew()  # 5 trading days
+        
+        # Z-score (daily and weekly)
+        rolling_mean_1d = df['spy_close'].rolling(window=26).mean()
+        rolling_std_1d = df['spy_close'].rolling(window=26).std()
+        df['z_score_1d'] = (df['spy_close'] - rolling_mean_1d) / rolling_std_1d
+        
+        rolling_mean_5d = df['spy_close'].rolling(window=130).mean()
+        rolling_std_5d = df['spy_close'].rolling(window=130).std()
+        df['z_score_5d'] = (df['spy_close'] - rolling_mean_5d) / rolling_std_5d
+        
+        # Rolling percentile (daily and weekly)
+        def rolling_percentile(x):
+            return (x.rank(pct=True).iloc[-1] * 100)
+        df['percentile_1d'] = df['spy_close'].rolling(window=26).apply(rolling_percentile)
+        df['percentile_5d'] = df['spy_close'].rolling(window=130).apply(rolling_percentile)
+        
+        # Entropy (daily and weekly)
+        def rolling_entropy(x):
+            value_counts = x.value_counts(normalize=True)
+            return -(value_counts * np.log(value_counts)).sum()
+        df['entropy_1d'] = df['spy_close'].rolling(window=26).apply(rolling_entropy)
+        df['entropy_5d'] = df['spy_close'].rolling(window=130).apply(rolling_entropy)
+        
         # Clean up intermediate columns
         columns_to_drop = ['hl2', 'ad_ratio']
         df = df.drop(columns_to_drop, axis=1, errors='ignore')
