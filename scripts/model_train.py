@@ -362,6 +362,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--export-only', action='store_true',
                        help='Export predictions without retraining')
+    parser.add_argument('--skip-training', action='store_true',
+                       help='Skip training and only export feature importance')
     args = parser.parse_args()
     
     # Fetch and prepare data with progress tracking
@@ -380,6 +382,30 @@ if __name__ == "__main__":
     if args.export_only:
         print("Exporting predictions from existing model...")
         export_predictions(df)
+        sys.exit(0)
+        
+    if args.skip_training:
+        print("Skipping training, exporting feature importance only...")
+        # Load existing model and artifacts
+        model = joblib.load('data/model.pkl')
+        scaler = joblib.load('data/scaler.pkl')
+        feature_columns = joblib.load('data/feature_columns.pkl')
+        
+        # Prepare features
+        X, y, _, _, valid_idx = prepare_features(df)
+        
+        # Calculate feature importance
+        importances = np.mean([est.feature_importances_ for est in model.estimators_], axis=0)
+        std = np.std([est.feature_importances_ for est in model.estimators_], axis=0)
+        feature_importance_df = pd.DataFrame({
+            'Feature': feature_columns,
+            'Importance': importances,
+            'Std': std
+        }).sort_values('Importance', ascending=False)
+        
+        # Save feature importance
+        feature_importance_df.to_csv('data/feature_importance.csv', index=False)
+        print("Feature importance exported to data/feature_importance.csv")
         sys.exit(0)
         
     print("Training model...")

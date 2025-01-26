@@ -239,8 +239,6 @@ def calculate_technical_indicators(df: pd.DataFrame, params: dict = None) -> pd.
         df['ad_ratio'] = df['spy_close'].diff() / tr
         df['ad_ratio'] = df['ad_ratio'].fillna(0)
         df['ad_ratio'] = (1 - params['admf_weight']) * df['ad_ratio'] + np.sign(df['ad_ratio']) * params['admf_weight']
-        # Add binary zone indicator
-        df['admf_above_zero'] = (df['admf'] > 0).astype(int)
         
         if params['admf_price_enable']:
             df['hlc3'] = (df['spy_high'] + df['spy_low'] + df['spy_close']) / 3
@@ -250,6 +248,9 @@ def calculate_technical_indicators(df: pd.DataFrame, params: dict = None) -> pd.
             
         alpha = 1 / params['admf_length']
         df['admf'] = (volume_factor * df['ad_ratio']).ewm(alpha=alpha, adjust=False).mean()
+        
+        # Add binary zone indicator after ADMF is calculated
+        df['admf_above_zero'] = (df['admf'] > 0).astype(int)
         
         # Rate of Change
         df['roc'] = ((df['spy_close'] - df['spy_close'].shift(params['roc_period'])) / 
