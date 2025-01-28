@@ -166,8 +166,8 @@ class MLStrategy:
             self.current_position = signals
             return signals
 
-def export_predictions(df, model_path='data/model.pkl', scaler_path='data/scaler.pkl', 
-                      feature_columns_path='data/feature_columns.pkl'):
+def export_predictions(df, model_path='models/model.pkl', scaler_path='models/scaler.pkl', 
+                      feature_columns_path='models/feature_columns.pkl'):
     """Export predictions using existing trained model"""
     try:
         # Validate model files exist
@@ -214,16 +214,17 @@ def export_predictions(df, model_path='data/model.pkl', scaler_path='data/scaler
             index=test_indices
         )
         
-        # Save predictions
+        # Save predictions with OHLCV data for backtesting.py
         test_results = pd.DataFrame({
-            'Actual_Return': y_test.iloc[:, 0],
-            'Actual_Exit_Long': y_test.iloc[:, 1],
-            'Actual_Exit_Short': y_test.iloc[:, 2],
-            'Predicted_Return': y_pred[:, 0],
-            'Predicted_Exit_Long': y_pred[:, 1],
-            'Predicted_Exit_Short': y_pred[:, 2],
+            'Open': df.loc[test_indices, 'spy_open'],
+            'High': df.loc[test_indices, 'spy_high'],
+            'Low': df.loc[test_indices, 'spy_low'],
+            'Close': df.loc[test_indices, 'spy_close'],
+            'Volume': df.loc[test_indices, 'spy_volume'],
             'Signal': signals,
-            'Confidence': confidence_scores
+            'Confidence': confidence_scores,
+            'Predicted_Return': y_pred[:, 0],
+            'Actual_Return': y_test.iloc[:, 0]
         }, index=test_indices)
         
         # Save to file
@@ -598,17 +599,11 @@ if __name__ == "__main__":
     
     signals = pd.Series(signals, index=test_indices)
     
-    # Save test predictions with proper column structure
-    test_results = pd.DataFrame({
-        'Actual_Return': y_test.iloc[:, 0],
-        'Actual_Exit_Long': y_test.iloc[:, 1],
-        'Actual_Exit_Short': y_test.iloc[:, 2],
-        'Predicted_Return': y_pred[:, 0],
-        'Predicted_Exit_Long': y_pred[:, 1],
-        'Predicted_Exit_Short': y_pred[:, 2],
-        'Signal': signals,
-        'Confidence': confidence_scores
-    }, index=test_indices)
+    # Save test predictions with OHLC data for backtesting
+    test_results = df.loc[test_indices].copy()
+    test_results['Signal'] = signals
+    test_results['Confidence'] = confidence_scores
+    test_results['Predicted_Return'] = y_pred[:, 0]
     
     # Ensure data directory exists
     data_dir = Path('data')
