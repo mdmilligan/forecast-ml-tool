@@ -1,9 +1,9 @@
 # Data files
 data/marketdata.db
-data/model.pkl
-data/scaler.pkl
-data/feature_columns.pkl
 data/test_predictions.csv
+model/model.pkl
+model/scaler.pkl
+model/feature_columns.pkl
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
@@ -168,3 +168,67 @@ cython_debug/
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 #.idea/
 .aider*
+# Data files
+data/feature_importance.png
+data/performance_history
+data/*.db
+data/*.csv
+data/*.pkl
+
+# Python cache and virtual environments
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# IDE specific files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs and databases
+*.log
+*.sqlite3
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
+.pytest_cache/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# pyenv
+.python-version
