@@ -195,10 +195,10 @@ def export_predictions(df, model_path='models/model.pkl', scaler_path='models/sc
         y_pred = model.predict(X_test)
         confidence_scores = MLStrategy(model, scaler, feature_columns).calculate_confidence_score(X_test)
         
-        # Generate signals using only the return predictions (first column)
+        # Generate signals using only the return predictions
         min_confidence = 0.5
-        return_predictions = y_pred[:, 0]  # Use only the return predictions
-        return_threshold = np.percentile(return_predictions, 75)
+        return_predictions = y_pred
+        return_threshold = np.percentile(return_predictions, 75)  # Use 75th percentile as threshold
         
         signals = pd.Series(
             np.where(
@@ -222,7 +222,7 @@ def export_predictions(df, model_path='models/model.pkl', scaler_path='models/sc
             'Volume': df.loc[test_indices, 'spy_volume'],
             'Signal': signals,
             'Confidence': confidence_scores,
-            'Predicted_Return': y_pred[:, 0],
+            'Predicted_Return': y_pred,
             'Actual_Return': y_test.iloc[:, 0]
         }, index=test_indices)
         
@@ -540,7 +540,7 @@ if __name__ == "__main__":
         'feature_count': [len(feature_columns)],
         'train_size': [len(X_train)],
         'test_size': [len(X_test)],
-        'mse': [mean_squared_error(y_test, model.predict(X_test))],
+        'mse': [mean_squared_error(y_test.iloc[:, 0], model.predict(X_test))],
         'mae': [mean_absolute_error(y_test, model.predict(X_test))],
         'top_feature_1': [feature_importance_df.iloc[0]['Feature']],
         'top_feature_1_importance': [feature_importance_df.iloc[0]['Importance']],
@@ -568,8 +568,8 @@ if __name__ == "__main__":
     # Generate signals with dynamic thresholds
     min_confidence = 0.5  # Lower confidence threshold
     
-    # Use only the return predictions (first column) for signals
-    return_predictions = y_pred[:, 0]
+    # Use only the return predictions for signals
+    return_predictions = y_pred
     return_threshold = np.percentile(return_predictions, 75)  # Use 75th percentile as threshold
     
     # Get test set indices from the position-based split
