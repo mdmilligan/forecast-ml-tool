@@ -9,8 +9,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import joblib
 from tqdm import tqdm
-from sklearn.ensemble import RandomForestRegressor
-from sklearn.multioutput import MultiOutputRegressor
+import lightgbm as lgb
 from sklearn.model_selection import RandomizedSearchCV
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import (
@@ -139,12 +138,11 @@ class MLStrategy:
         
     def calculate_confidence_score(self, X_scaled):
         """Calculate confidence score based on prediction variance"""
-        # Get predictions from all trees
-        predictions = np.array([tree.predict(X_scaled) for tree in self.model.estimators_])
+        # Get predictions from LightGBM
+        predictions = self.model.predict(X_scaled)
         
-        # Calculate confidence as inverse of standard deviation
-        std_dev = np.std(predictions, axis=0)
-        confidence = 1 / (1 + std_dev)
+        # Calculate confidence using prediction magnitude
+        confidence = np.abs(predictions) / np.max(np.abs(predictions))
         return confidence
         
     def enforce_hold_period(self, current_time, signals):
@@ -289,19 +287,20 @@ def train_model(X_train, y_train):
         # Combine metrics
         return -(mse - 0.2 * position_reward)  # Negative since we want to maximize
     
-    # Base model with multi-output support
-    from sklearn.multioutput import MultiOutputRegressor
-    base_model = RandomForestRegressor(random_state=42, n_jobs=-1, verbose=0)
-    model = MultiOutputRegressor(base_model)
+    # Base model - LightGBM
+    base_model = lgb.LGBMRegressor(random_state=42, n_jobs=-1, verbose=-1)
     
-    # Hyperparameter grid - nested under estimator__ for MultiOutputRegressor
+    # Hyperparameter grid for LightGBM
     param_dist = {
-        'estimator__n_estimators': [100, 200],
-        'estimator__max_depth': [10, 20],
-        'estimator__min_samples_split': [2, 5],
-        'estimator__min_samples_leaf': [1, 2],
-        'estimator__max_features': ['sqrt', 0.5],
-        'estimator__max_samples': [0.8]
+        'num_leaves': [31, 63, 127],
+        'learning_rate': [0.01, 0.05, 0.1],
+        'n_estimators': [100, 200, 500],
+        'max_depth': [5, 10, 20],
+        'min_child_samples': [20, 50, 100],
+        'subsample': [0.8, 0.9, 1.0],
+        'colsample_bytree': [0.8, 0.9, 1.0],
+        'reg_alpha': [0.0, 0.1, 0.5],
+        'reg_lambda': [0.0, 0.1, 0.5]
     }
     
     # Randomized search with custom scoring
@@ -486,13 +485,11 @@ if __name__ == "__main__":
     print(f"Mean Squared Error: {metrics['mse']:.4f}")
     print(f"R-squared: {metrics['r2']:.4f}")
     
-    # Feature selection based on importance - handle multi-output
-    importances = np.mean([est.feature_importances_ for est in model.estimators_], axis=0)
-    std = np.std([est.feature_importances_ for est in model.estimators_], axis=0)
+    # Feature importance for LightGBM
+    importances = model.feature_importances_
     feature_importance_df = pd.DataFrame({
         'Feature': feature_columns,
-        'Importance': importances,
-        'Std': std
+        'Importance': importances
     }).sort_values('Importance', ascending=False)
     
     # Keep all features
