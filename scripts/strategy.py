@@ -34,25 +34,16 @@ class MLStrategy:
             Tuple of (confidence_scores, mean_predictions)
         """
         try:
-            # Get predictions from all trees
-            predictions = np.array([tree.predict(X_scaled) 
-                                  for tree in self.model.estimators_])
+            # Get predictions from LightGBM
+            mean_pred = self.model.predict(X_scaled)
             
-            # Calculate base prediction
-            mean_pred = predictions.mean(axis=0)
-            
-            # Calculate tree agreement (lower std = higher agreement)
-            tree_std = predictions.std(axis=0)
-            agreement_score = 1 / (1 + tree_std)
-            
-            # Normalize prediction magnitude
-            magnitude_score = np.abs(mean_pred) / np.std(mean_pred)
-            
-            # Combine scores
-            confidence = (agreement_score * magnitude_score)
-            
-            # Normalize to 0-1 range
-            confidence = (confidence - confidence.min()) / (confidence.max() - confidence.min())
+            # Calculate confidence as normalized absolute predictions
+            confidence = np.abs(mean_pred)
+            max_conf = np.max(confidence)
+            if max_conf:
+                confidence = confidence / max_conf
+            else:
+                confidence = np.zeros_like(confidence)
             
             return confidence, mean_pred
             
