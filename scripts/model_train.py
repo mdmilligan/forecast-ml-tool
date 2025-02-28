@@ -530,7 +530,7 @@ if __name__ == "__main__":
     # Print top 20 features with formatting
     print("\nTop 20 Feature Importances:")
     top_20 = feature_importance_df.nlargest(20, 'Importance')
-    print(top_20[['Feature', 'Importance', 'Std']].to_string(index=False))
+    print(top_20[['Feature', 'Importance']].to_string(index=False))
     print("\nFull feature importance data saved to data/feature_importance.csv")
     
     # Update performance history
