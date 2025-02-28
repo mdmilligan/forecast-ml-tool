@@ -123,7 +123,8 @@ def prepare_features(df):
         X['market_state'] = X['market_state'].astype('category').cat.codes
     
     scaler = StandardScaler()
-    X_scaled = scaler.fit_transform(X)
+    X_scaled_values = scaler.fit_transform(X)
+    X_scaled = pd.DataFrame(X_scaled_values, columns=feature_columns, index=X.index)
     
     return X_scaled, y, scaler, feature_columns, valid_idx
 
@@ -252,12 +253,13 @@ def export_predictions(df, model_path='models/model.pkl', scaler_path='models/sc
 def train_model(X_train, y_train):
     """Train and save the model with turnover penalty"""
     from sklearn.model_selection import RandomizedSearchCV
+    # Extract primary target (return) for regression
+    y_train = y_train.iloc[:, 0]
     
     # Custom scoring function to penalize frequent trading
     def position_aware_score(estimator, X, y):
-        # Get predictions - use only return predictions (first column)
-        y_pred = estimator.predict(X)[:, 0]
-        y_true = y.iloc[:, 0]
+        y_pred = estimator.predict(X)
+        y_true = y
         
         # Calculate base MSE
         mse = mean_squared_error(y_true, y_pred)
@@ -305,7 +307,7 @@ def train_model(X_train, y_train):
     
     # Randomized search with custom scoring
     search = RandomizedSearchCV(
-        model,
+        base_model,
         param_distributions=param_dist,
         n_iter=10,
         cv=3,
@@ -445,10 +447,10 @@ if __name__ == "__main__":
     # Calculate multiple metrics
     metrics = {
         'train_date': datetime.now().isoformat(),
-        'mse': mean_squared_error(y_test, y_pred),
-        'mae': mean_absolute_error(y_test, y_pred),
-        'r2': r2_score(y_test, y_pred),
-        'explained_variance': explained_variance_score(y_test, y_pred),
+        'mse': mean_squared_error(y_test.iloc[:, 0], y_pred),
+        'mae': mean_absolute_error(y_test.iloc[:, 0], y_pred),
+        'r2': r2_score(y_test.iloc[:, 0], y_pred),
+        'explained_variance': explained_variance_score(y_test.iloc[:, 0], y_pred),
         'num_features': len(feature_columns),
         'test_set_size': len(X_test)
     }
@@ -502,7 +504,6 @@ if __name__ == "__main__":
     # Create horizontal bar plot
     plt.barh(sorted_features['Feature'], 
              sorted_features['Importance'], 
-             xerr=sorted_features['Std'],
              alpha=0.7)
     
     # Add labels and title
