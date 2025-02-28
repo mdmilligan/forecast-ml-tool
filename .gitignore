@@ -1,8 +1,12 @@
+# HTML output files
+*.html
+
 # Data files
 data/marketdata.db
 data/test_predictions.csv
 model/model.pkl
 model/scaler.pkl
+models/checkpoint_*.pkl
 model/feature_columns.pkl
 
 # Byte-compiled / optimized / DLL files
@@ -81,6 +85,9 @@ docs/_build/
 # PyBuilder
 .pybuilder/
 target/
+
+# Logs
+logs/*.log
 
 # Jupyter Notebook
 .ipynb_checkpoints
