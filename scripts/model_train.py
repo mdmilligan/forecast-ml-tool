@@ -541,7 +541,7 @@ if __name__ == "__main__":
         'train_size': [len(X_train)],
         'test_size': [len(X_test)],
         'mse': [mean_squared_error(y_test.iloc[:, 0], model.predict(X_test))],
-        'mae': [mean_absolute_error(y_test, model.predict(X_test))],
+        'mae': [mean_absolute_error(y_test.iloc[:, 0], model.predict(X_test))],
         'top_feature_1': [feature_importance_df.iloc[0]['Feature']],
         'top_feature_1_importance': [feature_importance_df.iloc[0]['Importance']],
         'top_feature_2': [feature_importance_df.iloc[1]['Feature']],
@@ -601,7 +601,7 @@ if __name__ == "__main__":
     test_results = df.loc[test_indices].copy()
     test_results['Signal'] = signals
     test_results['Confidence'] = confidence_scores
-    test_results['Predicted_Return'] = y_pred[:, 0]
+    test_results['Predicted_Return'] = y_pred
     
     # Ensure data directory exists
     data_dir = Path('data')
@@ -631,7 +631,7 @@ if __name__ == "__main__":
             file_path.unlink()  # Clean up partial file
         raise
     
-    total_time = time.time() - start_time
+    total_time = (datetime.now() - start_time).total_seconds()
     print(f"\nModel training pipeline complete!")
     print(f"Total time: {total_time:.1f} seconds")
     print("Breakdown:")
