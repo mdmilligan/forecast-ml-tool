@@ -28,7 +28,13 @@ def generate_predictions(df, start_date, end_date):
         df, max_position=1.0, min_confidence=0.2
     )
     
-    return signals, predictions, confidence_scores
+    # Return consistent data structure
+    return {
+        'signals': signals,
+        'predictions': predictions,
+        'confidence_scores': confidence_scores,
+        'timestamps': df.loc[start_date:end_date].index
+    }
 
 if __name__ == "__main__":
     print("Generating price forecasts...")
@@ -43,13 +49,19 @@ if __name__ == "__main__":
     end_date = '2023-12-31'
     signals, predictions, confidence_scores = generate_predictions(df, start_date, end_date)
     
-    # Save predictions
+    # Save minimal prediction data
     predictions_df = pd.DataFrame({
-        'signals': signals,
-        'predictions': predictions,
-        'confidence_scores': confidence_scores
-    }, index=df.loc[start_date:end_date].index)
-    predictions_df.to_csv('data/predictions.csv')
-    
+        'timestamp': df.loc[start_date:end_date].index,
+        'signal': signals,
+        'prediction': predictions,
+        'confidence': confidence_scores
+    })
+
+    # Save features separately
+    features_df = df[feature_columns].loc[start_date:end_date]
+    features_df.to_csv('data/test_features.csv', index=True)
+
+    predictions_df.to_csv('data/test_predictions.csv', index=False)
+
     print(f"Forecast complete! Time taken: {datetime.now() - start_time}")
-    print(f"Predictions saved to data/predictions.csv")
+    print(f"Predictions saved to data/test_predictions.csv")

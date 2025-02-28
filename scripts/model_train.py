@@ -213,26 +213,26 @@ def export_predictions(df, model_path='models/model.pkl', scaler_path='models/sc
             index=test_indices
         )
         
-        # Save predictions with OHLCV data for backtesting.py
+        # Save minimal prediction data
         test_results = pd.DataFrame({
-            'Open': df.loc[test_indices, 'spy_open'],
-            'High': df.loc[test_indices, 'spy_high'],
-            'Low': df.loc[test_indices, 'spy_low'],
-            'Close': df.loc[test_indices, 'spy_close'],
-            'Volume': df.loc[test_indices, 'spy_volume'],
-            'Signal': signals,
-            'Confidence': confidence_scores,
-            'Predicted_Return': y_pred,
-            'Actual_Return': y_test.iloc[:, 0]
+            'timestamp': test_indices,
+            'signal': signals,
+            'confidence': confidence_scores,
+            'predicted_return': y_pred,
+            'actual_return': y_test.iloc[:, 0]
         }, index=test_indices)
-        
+
+        # Save features separately
+        features_df = df[feature_columns].loc[test_indices]
+        features_df.to_csv('data/test_features.csv', index=True)
+
         # Save to file
         file_path = Path('data/test_predictions.csv')
         test_results.to_csv(file_path, index=True, date_format='%Y-%m-%d %H:%M:%S%z')
         print(f"\nSuccessfully exported predictions to {file_path.absolute()}")
-        
+
         return test_results
-        
+
     except MemoryError:
         logger.error("Out of memory - reduce data size or use smaller model")
         raise

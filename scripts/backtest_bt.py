@@ -1,6 +1,8 @@
 import pandas as pd
 import numpy as np
-from backtesting import Backtest, Strategy
+import backtesting as bt
+Backtest = bt.Backtest
+Strategy = bt.Strategy
 from data_process import load_market_data
 
 class MLTradingStrategy(Strategy):
@@ -20,22 +22,23 @@ class MLTradingStrategy(Strategy):
         self.confidence = self.predictions['Confidence']
         
     def next(self):
-        # Get current position and signal
-        # Access current bar's data using backtesting.py format
-        current_bar = self.data.df.iloc[-1]
-        current_signal = self.signals.loc[current_bar.name]
-        confidence = self.confidence.loc[current_bar.name]
+        # Get current position and signal using proper DataFeed access
+        current_time = self.data.index[-1]
+        
+        # Handle missing predictions safely
+        try:
+            current_signal = self.signals.loc[current_time]
+            confidence = self.confidence.loc[current_time]
+        except KeyError:
+            return  # Skip trading if no prediction exists
         
         # Only trade if confidence exceeds threshold
         if confidence > 0.7:
             if current_signal > 0 and not self.position:
-                # Long entry
                 self.buy(size=1)
             elif current_signal < 0 and not self.position:
-                # Short entry
                 self.sell(size=1)
             elif current_signal == 0 and self.position:
-                # Exit position
                 self.position.close()
 
 def run_backtest():
@@ -66,17 +69,17 @@ def run_backtest():
         }, index=df.index)
         
         # Initialize and run backtest
-        bt = Backtest(data, 
+        backtest = Backtest(data, 
                      MLTradingStrategy,
                      cash=100000,
                      commission=0.0005,
                      exclusive_orders=True)
         
         # Run optimization
-        stats = bt.run()
+        stats = backtest.run()
         
         # Plot results
-        bt.plot()
+        backtest.plot()
         
         print("\nBacktest Results:")
         print(f"Total Return: {stats['Return [%]']:.2f}%")
