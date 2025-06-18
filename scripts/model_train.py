@@ -42,10 +42,10 @@ def prepare_features(df):
         'volatility', 'atr', 'atr_20',
         
         # Momentum Indicators
-        'admf', 'admf_above_zero', 'roc', 'ultimate_rsi', 'ultimate_rsi_signal', 'ursi_above_50',
+        'admf', 'roc', 'ultimate_rsi', 'ultimate_rsi_signal', 
         
         # Fisher Transform
-        'fisher', 'fisher_trigger', 'fisher_above_zero',
+        'fisher', 'fisher_trigger', 
         
         # Distance to MAs
         'dist_to_EMA21', 'dist_to_EMA50', 'dist_to_5D_SMA', 'dist_to_20D_SMA', 
@@ -58,11 +58,12 @@ def prepare_features(df):
         'donchian_position', 'donchian_width',
         
         # Candle Features
-        'candle_body', 'upper_wick', 'lower_wick', 'candle_relative_position', 'candle_direction',
+        'candle_body', 'upper_wick', 'lower_wick', 'candle_relative_position', 
+        # 'candle_direction',
         
         # Bounce Features
-        'bounce_SMA5', 'bounce_SMA10', 'bounce_SMA20', 'bounce_SMA50', 'bounce_SMA100',
-        'bounce_bb_1d_upper', 'bounce_bb_1d_lower',
+        # 'bounce_SMA5', 'bounce_SMA10', 'bounce_SMA20', 'bounce_SMA50', 'bounce_SMA100',
+        # 'bounce_bb_1d_upper', 'bounce_bb_1d_lower',
         'bounce_strength_SMA5', 'bounce_strength_SMA10', 'bounce_strength_SMA20',
         'bounce_strength_SMA50', 'bounce_strength_SMA100',
         'bounce_strength_bb_1d_upper', 'bounce_strength_bb_1d_lower',
@@ -78,13 +79,13 @@ def prepare_features(df):
         'proximity_bb_1d_upper', 'proximity_bb_1d_lower',
         
         # Statistical Features
-        'autocorr_30m', 'skewness_1d', 'skewness_5d',
+        'skewness_1d', 'skewness_5d',
         'z_score_1d', 'z_score_5d',
         'percentile_1d', 'percentile_5d',
-        'entropy_1d', 'entropy_5d',
+        'entropy_1d', 'entropy_5d'
         
-        # Market State
-        'market_state'
+        # # Market State
+        # 'market_state'
     ]
 
     # Create feature matrix
