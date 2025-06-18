@@ -20,6 +20,7 @@ from sklearn.metrics import (
 )
 from sklearn.exceptions import ConvergenceWarning
 from data_process import load_market_data, calculate_technical_indicators
+import config
 
 # Initialize logger
 logging.basicConfig(level=logging.INFO)
@@ -131,7 +132,7 @@ def prepare_features(df):
     return X_scaled, y, scaler, feature_columns, valid_idx
 
 class MLStrategy:
-    def __init__(self, model, scaler, feature_columns, min_hold_bars=4):
+    def __init__(self, model, scaler, feature_columns, min_hold_bars=config.MIN_HOLD_BARS):
         self.model = model
         self.scaler = scaler
         self.feature_columns = feature_columns
@@ -327,16 +328,16 @@ def train_model(X_train, y_train):
     
     # Fit the best model from search with progress tracking
     
-    # Add progress tracking for RandomForest
-    if hasattr(best_model.estimator, 'n_estimators'):
+    # Add progress tracking for LightGBM
+    if hasattr(best_model, 'n_estimators'):
         from tqdm import tqdm
-        n_trees = best_model.estimator.n_estimators
+        n_trees = best_model.n_estimators
         start_time = time.time()
         
         # Use warm start to track progress
-        best_model.estimator.set_params(warm_start=True)
+        best_model.set_params(warm_start=True)
         for i in tqdm(range(10, n_trees + 1, 10), desc="Training trees", unit="trees"):
-            best_model.estimator.set_params(n_estimators=i)
+            best_model.set_params(n_estimators=i)
             best_model.fit(X_train, y_train)
             
             # Calculate progress
@@ -390,16 +391,16 @@ if __name__ == "__main__":
     if args.skip_training:
         print("Skipping training, exporting feature importance only...")
         # Load existing model and artifacts
-        model = joblib.load('data/model.pkl')
-        scaler = joblib.load('data/scaler.pkl')
-        feature_columns = joblib.load('data/feature_columns.pkl')
+        model = joblib.load('models/model.pkl')
+        scaler = joblib.load('models/scaler.pkl')
+        feature_columns = joblib.load('models/feature_columns.pkl')
         
         # Prepare features
         X, y, _, _, valid_idx = prepare_features(df)
         
         # Calculate feature importance
-        importances = np.mean([est.feature_importances_ for est in model.estimators_], axis=0)
-        std = np.std([est.feature_importances_ for est in model.estimators_], axis=0)
+        importances = model.feature_importances_
+        std = np.zeros_like(importances)
         feature_importance_df = pd.DataFrame({
             'Feature': feature_columns,
             'Importance': importances,
@@ -568,17 +569,17 @@ if __name__ == "__main__":
     confidence_scores = strategy.calculate_confidence_score(X_test)
     
     # Generate signals with dynamic thresholds
-    min_confidence = 0.5  # Lower confidence threshold
+    min_confidence = config.MIN_CONFIDENCE  # Confidence threshold from config
     
     # Use only the return predictions for signals
     return_predictions = y_pred
-    return_threshold = np.percentile(return_predictions, 75)  # Use 75th percentile as threshold
+    return_threshold = np.percentile(return_predictions, config.RETURN_THRESHOLD_PERCENTILE)  # Threshold percentile from config
     
     # Get test set indices from the position-based split
     test_indices = df.index[valid_idx][split_idx:]
     
-    # Initialize strategy with 3 bar hold period
-    strategy = MLStrategy(model, scaler, feature_columns, min_hold_bars=3)
+    # Initialize strategy with configured hold period
+    strategy = MLStrategy(model, scaler, feature_columns, min_hold_bars=config.MIN_HOLD_BARS)
     
     # Generate raw signals using only return predictions
     raw_signals = np.where(

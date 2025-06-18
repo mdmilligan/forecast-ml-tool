@@ -1,0 +1,5 @@
+# Project configuration settings
+
+MIN_CONFIDENCE = 0.5
+RETURN_THRESHOLD_PERCENTILE = 75
+MIN_HOLD_BARS = 3
