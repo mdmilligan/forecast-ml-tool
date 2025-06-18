@@ -11,7 +11,7 @@ import joblib
 from tqdm import tqdm
 import lightgbm as lgb
 from sklearn.model_selection import RandomizedSearchCV
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import PowerTransformer
 from sklearn.metrics import (
     mean_squared_error,
     r2_score,
@@ -123,7 +123,8 @@ def prepare_features(df):
     if 'market_state' in X.columns:
         X['market_state'] = X['market_state'].astype('category').cat.codes
     
-    scaler = StandardScaler()
+    # box-cox only works for strictly positive data; for OHLCV etc. use yeo-johnson
+    scaler = PowerTransformer(method='yeo-johnson', standardize=True)
     X_scaled_values = scaler.fit_transform(X)
     X_scaled = pd.DataFrame(X_scaled_values, columns=feature_columns, index=X.index)
     
