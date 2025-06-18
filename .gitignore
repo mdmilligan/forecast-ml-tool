@@ -240,3 +240,4 @@ coverage.xml
 # pyenv
 .python-version
 models/model.pkl
+data/test_predictions.csv

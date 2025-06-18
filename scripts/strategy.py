@@ -46,7 +46,14 @@ class MLStrategy:
         X_scaled = self.scaler.transform(X)
 
         predictions = self.model.predict(X_scaled)
-        returns, exit_long, exit_short = predictions[:, 0], predictions[:, 1], predictions[:, 2]
+        if predictions.ndim == 1:
+            # Single-output model: only returns available
+            returns = predictions
+            exit_long = np.zeros_like(predictions)
+            exit_short = np.zeros_like(predictions)
+        else:
+            # Multi-output model: unpack return and exit signals
+            returns, exit_long, exit_short = predictions[:, 0], predictions[:, 1], predictions[:, 2]
         confidence_scores = self.calculate_confidence_score(X_scaled)
 
         signals = pd.Series(index=df.index, data=0.0)

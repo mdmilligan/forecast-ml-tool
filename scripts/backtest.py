@@ -526,8 +526,8 @@ def load_and_backtest():
         test_df = df_market.loc[common_index]
         test_results_aligned = test_results.loc[common_index]
 
-        signals_input = test_results_aligned['Signal']
-        confidence_input = test_results_aligned.get('Confidence', None) # This will be a Series or None
+        signals_input = test_results_aligned['signal']
+        confidence_input = test_results_aligned.get('confidence', None) # This will be a Series or None
         
         metrics_output = run_backtest(
             test_df,
