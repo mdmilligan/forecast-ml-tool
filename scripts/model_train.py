@@ -199,9 +199,9 @@ def export_predictions(df, model_path='models/model.pkl', scaler_path='models/sc
         confidence_scores = MLStrategy(model, scaler, feature_columns).calculate_confidence_score(X_test)
         
         # Generate signals using only the return predictions
-        min_confidence = 0.5
+        min_confidence = config.MIN_CONFIDENCE  # Confidence threshold from config
         return_predictions = y_pred
-        return_threshold = np.percentile(return_predictions, 75)  # Use 75th percentile as threshold
+        return_threshold = np.percentile(return_predictions, config.RETURN_THRESHOLD_PERCENTILE)  # Threshold percentile from config
         
         signals = pd.Series(
             np.where(
