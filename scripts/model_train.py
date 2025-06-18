@@ -131,7 +131,7 @@ def prepare_features(df):
     return X_scaled, y, scaler, feature_columns, valid_idx
 
 class MLStrategy:
-    def __init__(self, model, scaler, feature_columns, min_hold_bars=3):
+    def __init__(self, model, scaler, feature_columns, min_hold_bars=4):
         self.model = model
         self.scaler = scaler
         self.feature_columns = feature_columns
@@ -320,13 +320,12 @@ def train_model(X_train, y_train):
     )
     
     search.fit(X_train, y_train)
-    print(f"Best parameters: {search.best_params_}")
-    print(f"Best CV score: {-search.best_score_:.4f}")
+    logger.info(f"Best parameters: {search.best_params_}")
+    logger.info(f"Best CV score: {-search.best_score_:.4f}")
     
-    return search.best_estimator_
+    best_model = search.best_estimator_
     
     # Fit the best model from search with progress tracking
-    best_model = search.best_estimator_
     
     # Add progress tracking for RandomForest
     if hasattr(best_model.estimator, 'n_estimators'):
@@ -437,9 +436,10 @@ if __name__ == "__main__":
     
     print("Saving model artifacts...")
     start_save = time.time()
-    joblib.dump(model, 'data/model.pkl')
-    joblib.dump(scaler, 'data/scaler.pkl')
-    joblib.dump(feature_columns, 'data/feature_columns.pkl')
+    Path('models').mkdir(exist_ok=True)
+    joblib.dump(model, 'models/model.pkl')
+    joblib.dump(scaler, 'models/scaler.pkl')
+    joblib.dump(feature_columns, 'models/feature_columns.pkl')
     save_time = time.time() - start_save
     print(f"Model artifacts saved in {save_time:.1f} seconds")
     
