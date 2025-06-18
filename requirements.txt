@@ -10,3 +10,6 @@ tqdm>=4.62.0
 lightgbm>=4.0.0
 backtesting
 Bokeh
+dash
+dash-bootstrap-components
+waitress

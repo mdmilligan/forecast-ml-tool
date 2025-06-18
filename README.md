@@ -106,6 +106,35 @@ python scripts/forecast_price.py
 # View interactive technical indicators
 python scripts/view_indicators.py
 ```
+### Detailed Backtesting (`scripts/backtest.py`)
+
+This script provides a comprehensive backtesting environment with an interactive dashboard.
+
+**Prerequisites:**
+
+*   A Conda environment (e.g., `predictor_env`) must be active.
+*   All dependencies from `requirements.txt` (including `dash`, `dash-bootstrap-components`, and `waitress`) must be installed in the Conda environment.
+*   The input data file `data/test_predictions.csv` must exist. If not, run `scripts/model_train.py` first to generate predictions.
+*   The market data database `data/marketdata.db` must exist and be populated (e.g., using `scripts/data_fetch.py` or `scripts/fetch_ibkrdata.py`).
+
+**Command to Run:**
+
+```bash
+conda run -n predictor_env python scripts/backtest.py
+```
+
+**Expected Outcome:**
+
+*   Backtest performance metrics will be printed to the console.
+*   An interactive dashboard will launch in your default web browser, typically at `http://127.0.0.1:8050/`. This dashboard displays equity curves, drawdown, trade markers, and confidence scores.
+
+**Stopping the Script:**
+
+*   To stop the backtesting script and the web server, press `Ctrl+C` in the terminal where the script is running.
+
+**Troubleshooting (Windows):**
+
+*   If you encounter an error like "Python was not found", ensure that app execution aliases for `python.exe` and `python3.exe` are disabled in Windows Settings (`Settings > Apps > Advanced app settings > App execution aliases`). This allows the Python interpreter from your Conda environment to be used.
 
 ## Project Structure
 
