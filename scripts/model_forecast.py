@@ -3,6 +3,7 @@ import numpy as np
 import joblib
 from datetime import datetime
 from data_process import load_market_data, calculate_technical_indicators
+import config
 from strategy import MLStrategy
 
 
@@ -25,24 +26,19 @@ def generate_predictions(df, start_date, end_date):
     # Generate predictions
     strategy = MLStrategy(model, scaler, feature_columns)
     signals, predictions, confidence_scores = strategy.generate_signals(
-        df, max_position=1.0, min_confidence=0.2
+        df, max_position=1.0, min_confidence=config.MIN_CONFIDENCE
     )
     
-    # Return consistent data structure
-    return {
-        'signals': signals,
-        'predictions': predictions,
-        'confidence_scores': confidence_scores,
-        'timestamps': df.loc[start_date:end_date].index
-    }
+    # Return signals, predictions, confidence scores, and timestamps
+    return signals, predictions, confidence_scores, df.index
 
 if __name__ == "__main__":
     print("Generating price forecasts...")
     start_time = datetime.now()
 
     # Example usage
-    start_date = '2023-01-01'
-    end_date = '2023-12-31'
+    start_date = config.START_DATE
+    end_date = config.END_DATE
 
     # Load data from the database
     df = load_market_data(start_date=start_date, end_date=end_date)

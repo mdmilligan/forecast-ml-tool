@@ -417,7 +417,7 @@ if __name__ == "__main__":
     X, y, scaler, feature_columns, valid_idx = prepare_features(df)
     
     # Split data by position - train on first 90%, test on last 10%
-    split_idx = int(len(X) * 0.9)
+    split_idx = int(len(X) * config.TEST_SPLIT_RATIO)
     X_train, X_test = X[:split_idx], X[split_idx:]
     y_train, y_test = y[:split_idx], y[split_idx:]
     
@@ -645,9 +645,9 @@ if __name__ == "__main__":
     
     # Verify all outputs exist
     required_files = [
-        'data/model.pkl',
-        'data/scaler.pkl',
-        'data/feature_columns.pkl',
+        'models/model.pkl',
+        'models/scaler.pkl',
+        'models/feature_columns.pkl',
         'data/test_predictions.csv',
         'data/feature_importance.png',
         'data/feature_importance.csv',
@@ -669,4 +669,4 @@ if __name__ == "__main__":
     else:
         print("\nAll output files created successfully")
     
-    print("\nYou can now run backtest.py to evaluate performance")
+    print("\nYou can now run model_train.py")

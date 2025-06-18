@@ -4,9 +4,10 @@ from datetime import timedelta
 from sklearn.metrics import accuracy_score
 import matplotlib.pyplot as plt
 from data_process import load_market_data
+import config
 
 class Backtester:
-    def __init__(self, initial_capital=100000, commission=0.0005):
+    def __init__(self, initial_capital=config.INITIAL_CAPITAL, commission=config.COMMISSION):
         self.initial_capital = initial_capital
         self.commission = commission
         
