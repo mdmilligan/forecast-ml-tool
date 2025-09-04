@@ -241,4 +241,3 @@ coverage.xml
 .python-version
 models/model.pkl
 data/test_predictions.csv
-data/test_predictions.csv
