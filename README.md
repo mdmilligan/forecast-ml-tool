@@ -1,211 +1,132 @@
-# Market Forecasting and Trading Strategy System
+# Market Forecast Tool
+A Python system for market data ingestion, technical feature engineering, ML forecasting and backtesting.
 
-![Python](https://img.shields.io/badge/python-3.8%2B-blue)
-![License](https://img.shields.io/badge/license-MIT-green)
-![ML](https://img.shields.io/badge/machine%20learning-random%20forest-orange)
+## Project name and one-line description
+Market Forecast Tool — end-to-end pipeline to fetch market data, create features, train forecasting models and backtest trading strategies.
 
-A comprehensive Python-based system for market data analysis, machine learning forecasting, and trading strategy development. This project demonstrates advanced skills in financial data engineering, machine learning, and quantitative analysis.
+## Prerequisites
+- Python 3.8+
+- SQLite available (used by scripts/data_fetch.py)
+- Optional: Interactive Brokers Gateway / TWS if using live data (scripts/data_fetch.py uses ib_insync)
+- A web browser for Dash backtest dashboard
 
-## Key Features
+## Install
+1. Clone the repository:
+   - git clone <repo-url>
+   - cd MarketForecastTool
+2. Create and activate a virtual environment:
+   - python -m venv venv
+   - Windows: venv\Scripts\activate
+   - macOS/Linux: source venv/bin/activate
+3. Install dependencies:
+   - pip install -r requirements.txt
 
-### Data Pipeline
-- **Automated Data Collection**: Fetches historical market data from Interactive Brokers API
-- **Multi-Asset Support**: SPY, VIX, UUP with configurable timeframes (1m to 1D)
-- **Data Storage**: SQLite database for efficient data management
+## Installation notes
+- The dependencies are listed in [`requirements.txt`](requirements.txt:1).
+- Heavy packages: lightgbm, ib_insync, dash; install with system package managers if wheel builds fail.
 
-### Technical Analysis
-- **Advanced Indicators**: 
-  - Ultimate RSI with signal line
-  - Fisher Transform
-  - Accumulation/Distribution Money Flow (ADMF)
-  - Bollinger Bands %B and Bandwidth
-  - Volatility and ATR
-- **Custom Calculations**: 
-  - Distance to Moving Averages
-  - 5D SMA Slope
-  - Rate of Change (ROC)
+## Entrypoints and scripts
+- Top-level orchestrator: [`main.py`](main.py:1)
+- Core scripts (in repository):
+  - [`scripts/data_fetch.py`](scripts/data_fetch.py:1) — fetch historical data from IBKR and write to `data/marketdata.db`
+  - [`scripts/model_train.py`](scripts/model_train.py:1) — full training pipeline and artifact export
+  - [`scripts/model_forecast.py`](scripts/model_forecast.py:1) — generate predictions using saved artifacts
+  - [`scripts/backtest.py`](scripts/backtest.py:1) — run backtest and launch Dash dashboard
+  - [`scripts/config.py`](scripts/config.py:1) — runtime configuration values
+  - [`scripts/visualization.py`](scripts/visualization.py:1) — helper plotting/visualization utilities
 
-### Machine Learning
-- **Predictive Modeling**:
-  - Random Forest Regressor with 300 estimators
-  - Feature importance analysis
-  - Confidence-based predictions
-- **Model Evaluation**:
-  - Backtesting framework with performance metrics
-  - Position sizing based on prediction confidence
-  - Win rate and Sharpe ratio tracking
+## How to run (Usage)
+All commands run from repository root.
 
-### Visualization
-- **Interactive Dashboards**:
-  - 11-panel technical indicator view
-  - Confidence score visualization
-  - Backtest performance charts
-- **Custom Plotly Charts**:
-  - Price and position sizing overlay
-  - Cumulative returns comparison
-  - Feature importance plots
+### 1) Fetch historical market data (Interactive Brokers)
+Example (30-minute bars for SPY):
+   python scripts/data_fetch.py --symbol SPY --bar-size "30 mins" --start-date 2019-01-01 --end-date 2021-01-01
+Notes:
+- Output: writes to SQLite database `data/marketdata.db` and returns a DataFrame when run as module.
+- Requires IB Gateway/TWS running and accessible on ports 7497 / 4001 / 4002.
 
-## Tech Stack
+### 2) Train the model (end-to-end)
+   python scripts/model_train.py
+What this does:
+- Loads market data via `load_market_data()` and computes indicators
+- Prepares features and trains a LightGBM regressor
+- Saves artifacts to `models/` and predictions to `data/test_predictions.csv`
+Optional flags:
+- `--export-only` — export predictions using existing artifacts without retraining
+- `--skip-training` — skip training and export feature importance (requires existing model artifacts)
 
-- **Core**: Python 3.8+
-- **Data Processing**: Pandas, NumPy
-- **Machine Learning**: Scikit-learn, Joblib
-- **Visualization**: Plotly, Matplotlib
-- **Database**: SQLite
-- **Broker Integration**: IBKR API (ib_insync)
+### 3) Generate forecasts (use existing artifacts)
+   python scripts/model_forecast.py
+Output:
+- `data/test_predictions.csv`
+- `data/test_features.csv` (if feature_columns present)
 
-## Installation
+### 4) Backtest and dashboard
+- Run backtest (reads `data/test_predictions.csv` and `data/marketdata.db`):
+   python scripts/backtest.py
+- Orchestrator option:
+   python main.py --backtest
+Expected:
+- Console prints summary metrics and a Dash dashboard launches at http://127.0.0.1:8050/
+- Stop server with Ctrl+C
 
-```bash
-# Clone repository
-git clone https://github.com/yourusername/market-forecast-tool.git
-cd market-forecast-tool
+### 5) Orchestrator CLI
+The top-level [`main.py`](main.py:1) supports:
+- --train
+- --backtest
+- --predict
+Note: some internal function signatures differ between `main.py` and `scripts/*` modules; prefer running the scripts directly if `main.py` produces errors.
 
-# Create virtual environment
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+## Important file locations
+- data/: persistent data and outputs (e.g., `data/marketdata.db`, `data/test_predictions.csv`)
+- models/: saved model artifacts (`models/model.pkl`, `models/scaler.pkl`, `models/feature_columns.pkl`)
+- documentation/: design notes and guides (`documentation/code_overview.md`, `documentation/training.md`)
 
-# Install dependencies
-pip install -r requirements.txt
-```
+## Example minimal flows
+1) Quick backtest (data already present)
+   python scripts/backtest.py
 
-## Usage Examples
+2) End-to-end example (requires IBKR)
+   python scripts/data_fetch.py --symbol SPY --bar-size "30 mins" --start-date 2019-01-01 --end-date 2021-01-01
+   python scripts/model_train.py
+   python scripts/backtest.py
 
-### Data Collection
-```bash
-# Fetch historical data with various options
-python scripts/fetch_ibkrdata.py -s SYMBOL -b BAR_SIZE [--start-date YYYY-MM-DD] [--end-date YYYY-MM-DD]
+3) Generate predictions only (model artifacts already present)
+   python scripts/model_forecast.py
 
-# Example: Fetch 30-minute SPY data from 2013-01-01 to 2013-03-25
-python scripts/fetch_ibkrdata.py -s SPY -b "30 mins" --start-date 2013-01-01 --end-date 2013-03-25
+## Troubleshooting & common issues
+- "Model files not found": ensure `models/model.pkl`, `models/scaler.pkl`, `models/feature_columns.pkl` exist. Create them with `python scripts/model_train.py`.
+- IBKR connection failures: ensure IB Gateway/TWS is running and API connections are enabled; confirm port (7497/4001/4002) and firewall rules.
+- Timezone or index mismatches: scripts attempt to align timezone-aware indices; check timestamps in `data/test_predictions.csv` and `data/marketdata.db` if alignment errors occur.
+- Dashboard not opening: open http://127.0.0.1:8050/ manually.
+- Missing tests or license: no `tests/` folder and no `LICENSE` file detected.
 
-# Example: Fetch 1-hour VIX data for last 3 years
-python scripts/fetch_ibkrdata.py -s VIX -b "1 hour"
-
-# Arguments:
-#   -s, --symbol       Stock symbol to fetch (e.g., SPY, VIX, UUP)
-#   -b, --bar-size     Bar size for historical data (1 min, 5 mins, 15 mins, 30 mins, 1 hour, 1 day)
-#   --start-date       Start date for historical data (YYYY-MM-DD)
-#   --end-date         End date for historical data (YYYY-MM-DD). If not provided, collects up to most recent available data
-```
-
-### Model Training
-```bash
-# Train model with default parameters
-python scripts/train_model.py
-```
-
-### Strategy Backtesting
-```bash
-# Run backtest with confidence-based position sizing
-python scripts/forecast_price.py
-```
-
-### Technical Analysis
-```bash
-# View interactive technical indicators
-python scripts/view_indicators.py
-```
-### Detailed Backtesting (`scripts/backtest.py`)
-
-This script provides a comprehensive backtesting environment with an interactive dashboard.
-
-**Prerequisites:**
-
-*   A Conda environment (e.g., `predictor_env`) must be active.
-*   All dependencies from `requirements.txt` (including `dash`, `dash-bootstrap-components`, and `waitress`) must be installed in the Conda environment.
-*   The input data file `data/test_predictions.csv` must exist. If not, run `scripts/model_train.py` first to generate predictions.
-*   The market data database `data/marketdata.db` must exist and be populated (e.g., using `scripts/data_fetch.py` or `scripts/fetch_ibkrdata.py`).
-
-**Command to Run:**
-
-```bash
-conda run -n predictor_env python scripts/backtest.py
-```
-
-**Expected Outcome:**
-
-*   Backtest performance metrics will be printed to the console.
-*   An interactive dashboard will launch in your default web browser, typically at `http://127.0.0.1:8050/`. This dashboard displays equity curves, drawdown, trade markers, and confidence scores.
-
-**Stopping the Script:**
-
-*   To stop the backtesting script and the web server, press `Ctrl+C` in the terminal where the script is running.
-
-**Troubleshooting (Windows):**
-
-*   If you encounter an error like "Python was not found", ensure that app execution aliases for `python.exe` and `python3.exe` are disabled in Windows Settings (`Settings > Apps > Advanced app settings > App execution aliases`). This allows the Python interpreter from your Conda environment to be used.
-
-## Project Structure
-
-```
-market-forecast-tool/
-├── data/                   # Persistent data storage
-│   ├── marketdata.db       # Market data database
-│   ├── model.pkl           # Trained ML model
-│   ├── scaler.pkl          # Feature scaler
-│   └── feature_columns.pkl # Feature names
-│
-├── scripts/                # Core application code
-│   ├── fetch_ibkrdata.py   # Data collection
-│   ├── train_model.py      # Model training
-│   ├── forecast_price.py   # Prediction & backtesting
-│   ├── view_indicators.py  # Technical analysis
-│   ├── backtest.py         # Backtesting framework
-│   └── data_processing.py  # Feature engineering
-│
-├── tests/                  # Unit tests
-├── requirements.txt        # Python dependencies
-└── README.md               # Project documentation
-```
-
-## Key Metrics Tracked
-
-- **Model Performance**:
-  - R² Score
-  - Mean Squared Error
-  - Feature Importance
-- **Strategy Performance**:
-  - Annualized Return
-  - Sharpe Ratio
-  - Max Drawdown
-  - Win Rate
-  - Average Trade Duration
+## Tests
+- No automated tests present. To add tests:
+  - Create a `tests/` directory with pytest tests
+  - Add `pytest` to `requirements.txt`
+  - Run `pytest`
 
 ## Configuration
+- Edit [`scripts/config.py`](scripts/config.py:1) for defaults:
+  - `MIN_CONFIDENCE`, `RETURN_THRESHOLD_PERCENTILE`, `MIN_HOLD_BARS`
+  - `START_DATE`, `END_DATE`
+  - `TEST_SPLIT_RATIO`, `INITIAL_CAPITAL`, `COMMISSION`
 
-Customize system behavior through these key parameters:
-
-- **Data Collection**:
-  - `DB_PATH` in `fetch_ibkrdata.py`
-  - IBKR connection settings
-  - Historical data range
-
-- **Model Training**:
-  - Random Forest parameters in `train_model.py`
-  - Feature engineering settings in `data_processing.py`
-
-- **Trading Strategy**:
-  - Confidence thresholds
-  - Position sizing rules
-  - Risk management parameters
-
-## Contributing
-
-Contributions are welcome! Please follow these steps:
-
-1. Fork the repository
-2. Create a new branch (`git checkout -b feature/YourFeature`)
-3. Commit your changes (`git commit -m 'Add some feature'`)
-4. Push to the branch (`git push origin feature/YourFeature`)
-5. Open a pull request
+## Notes on mismatches found
+- README referenced scripts with different names than present. Use the actual script filenames in `scripts/`.
+- Model artifacts are saved to `models/`, not `data/` (README previously said otherwise).
+- `main.py` calls internal functions with signatures that may not match script definitions (e.g., `generate_predictions`). Use script runners for reliability.
+- No `tests/` or `LICENSE` present in root (README previously referenced them).
+- Total mismatches/outdated items found: 6
 
 ## License
+- No license file detected. Add one (e.g., MIT) at repository root as `LICENSE`.
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+## Where to look next
+- [`documentation/code_overview.md`](documentation/code_overview.md:1)
+- [`documentation/training.md`](documentation/training.md:1)
+- [`documentation/backtesting_roadmap.md`](documentation/backtesting_roadmap.md:1)
 
-## Acknowledgments
-
-- Interactive Brokers for market data API
-- Scikit-learn for machine learning framework
-- Plotly for interactive visualizations
+--- 
+End of README
