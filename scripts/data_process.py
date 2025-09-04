@@ -68,15 +68,23 @@ def calculate_ultimate_rsi(df: pd.DataFrame, length: int = 14, smooth: int = 5) 
         price_range = upper - lower
         price_diff = source.diff()
         
-        diff = pd.Series(0, index=df.index)
-        for i in range(1, len(df)):
-            if upper.iloc[i] > upper.iloc[i-1]:
-                diff.iloc[i] = price_range.iloc[i]
-            elif lower.iloc[i] < lower.iloc[i-1]:
-                diff.iloc[i] = -price_range.iloc[i]
-            else:
-                diff.iloc[i] = float(price_diff.iloc[i])
-                
+        # Create a float-dtype Series for 'diff' using vectorized operations to avoid per-row iloc writes
+        # Prevent pandas FutureWarning caused by assigning float-like values into an int64 Series.
+        price_diff_num = pd.to_numeric(price_diff, errors='coerce').astype(float)
+        diff = pd.Series(np.nan, index=df.index, dtype=float)
+
+        mask_up = upper > upper.shift(1)
+        mask_down = lower < lower.shift(1)
+        mask_else = ~(mask_up | mask_down)
+
+        diff.loc[mask_up] = price_range.loc[mask_up].astype(float)
+        diff.loc[mask_down] = (-price_range.loc[mask_down]).astype(float)
+        diff.loc[mask_else] = price_diff_num.loc[mask_else]
+
+        # Assign vectorized Series to dataframe and ensure dtype is float to prevent coercion/future errors
+        df['diff'] = diff.astype(float)
+        print("diff dtype:", df['diff'].dtype)
+        
         num = diff.ewm(alpha=1/length, adjust=False).mean()
         den = diff.abs().ewm(alpha=1/length, adjust=False).mean()
         
@@ -488,4 +496,3 @@ if __name__ == "__main__":
         
     except Exception as e:
         print(f"Error in data processing test: {str(e)}")
-
