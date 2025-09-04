@@ -3,8 +3,8 @@ import numpy as np
 from datetime import timedelta
 from sklearn.metrics import accuracy_score
 import matplotlib.pyplot as plt
-from data_process import load_market_data
-import config
+from scripts.data_process import load_market_data
+from scripts import config
 
 class Backtester:
     def __init__(self, initial_capital=config.INITIAL_CAPITAL, commission=config.COMMISSION):

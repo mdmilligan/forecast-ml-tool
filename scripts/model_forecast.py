@@ -2,9 +2,9 @@ import pandas as pd
 import numpy as np
 import joblib
 from datetime import datetime
-from data_process import load_market_data, calculate_technical_indicators
-import config
-from strategy import MLStrategy
+from scripts.data_process import load_market_data, calculate_technical_indicators
+from scripts import config
+from scripts.strategy import MLStrategy
 
 
 def generate_predictions(df, start_date, end_date):

@@ -19,8 +19,8 @@ from sklearn.metrics import (
     explained_variance_score
 )
 from sklearn.exceptions import ConvergenceWarning
-from data_process import load_market_data, calculate_technical_indicators
-import config
+from scripts.data_process import load_market_data, calculate_technical_indicators
+from scripts import config
 
 # Initialize logger
 logging.basicConfig(level=logging.INFO)
